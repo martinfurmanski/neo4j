@@ -30,8 +30,9 @@ import org.neo4j.io.fs.StoreChannel;
 public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChannel
 {
     private final StoreChannel delegateChannel;
-    private long version;
+    private final long version;
     private final byte formatVersion;
+    private long position;
 
     public PhysicalLogVersionedStoreChannel( StoreChannel delegateChannel, long version, byte formatVersion )
     {
@@ -49,31 +50,33 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
     @Override
     public int write( ByteBuffer src, long position ) throws IOException
     {
-        return delegateChannel.write( src, position );
+        throw new UnsupportedOperationException( "Please implement" );
     }
 
     @Override
     public void writeAll( ByteBuffer src, long position ) throws IOException
     {
-        delegateChannel.writeAll( src, position );
+        throw new UnsupportedOperationException( "Please implement" );
     }
 
     @Override
     public void writeAll( ByteBuffer src ) throws IOException
     {
+        int bytes = src.remaining();
         delegateChannel.writeAll( src );
+        position += bytes;
     }
 
     @Override
     public MappedByteBuffer map( FileChannel.MapMode mode, long position, long size ) throws IOException
     {
-        return delegateChannel.map( mode, position, size );
+        throw new UnsupportedOperationException( "Please implement" );
     }
 
     @Override
     public int read( ByteBuffer dst, long position ) throws IOException
     {
-        return delegateChannel.read( dst, position );
+        throw new UnsupportedOperationException( "Please implement" );
     }
 
     @Override
@@ -85,6 +88,7 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
     @Override
     public StoreChannel position( long newPosition ) throws IOException
     {
+        this.position = newPosition;
         return delegateChannel.position( newPosition );
     }
 
@@ -97,19 +101,25 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
     @Override
     public int read( ByteBuffer dst ) throws IOException
     {
-        return delegateChannel.read( dst );
+        return (int) advance( delegateChannel.read( dst ) );
+    }
+
+    private long advance( long bytes )
+    {
+        position += bytes;
+        return bytes;
     }
 
     @Override
     public int write( ByteBuffer src ) throws IOException
     {
-        return delegateChannel.write( src );
+        return (int) advance( delegateChannel.write( src ) );
     }
 
     @Override
     public long position() throws IOException
     {
-        return delegateChannel.position();
+        return position;
     }
 
     @Override
@@ -133,25 +143,25 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
     @Override
     public long write( ByteBuffer[] srcs, int offset, int length ) throws IOException
     {
-        return delegateChannel.write( srcs, offset, length );
+        return advance( delegateChannel.write( srcs, offset, length ) );
     }
 
     @Override
     public long write( ByteBuffer[] srcs ) throws IOException
     {
-        return delegateChannel.write( srcs );
+        return advance( delegateChannel.write( srcs ) );
     }
 
     @Override
     public long read( ByteBuffer[] dsts, int offset, int length ) throws IOException
     {
-        return delegateChannel.read( dsts, offset, length );
+        return advance( delegateChannel.read( dsts, offset, length ) );
     }
 
     @Override
     public long read( ByteBuffer[] dsts ) throws IOException
     {
-        return delegateChannel.read( dsts );
+        return advance( delegateChannel.read( dsts ) );
     }
 
     @Override
