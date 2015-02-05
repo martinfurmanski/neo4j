@@ -53,7 +53,7 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
         this.nameStore = nameStore;
     }
 
-    DynamicStringStore getNameStore()
+    public DynamicStringStore getNameStore()
     {
         return nameStore;
     }

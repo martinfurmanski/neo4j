@@ -65,6 +65,8 @@ public interface RecordStore<R extends AbstractBaseRecord>
         }
     };
 
+    public void setHighId( long id );
+
     public static abstract class Processor
     {
         private boolean continueScanning = true;

@@ -172,6 +172,12 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
         actual.close();
     }
 
+    @Override
+    public void setHighId( long id )
+    {
+        // todo?
+    }
+
     public R getChangedRecord( long id )
     {
         return diff.get( id );

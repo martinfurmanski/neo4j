@@ -204,7 +204,7 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window );
+            updateRecord( record, window, false );
         }
         finally
         {
@@ -215,14 +215,14 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
     @Override
     public void forceUpdateRecord( PropertyRecord record )
     {
-        updateRecord( record ); // TODO: should we do something special for property records?
+        updateRecord( record, true );
     }
 
-    private void updateRecord( PropertyRecord record, PersistenceWindow window )
+    private void updateRecord( PropertyRecord record, PersistenceWindow window, boolean force )
     {
         long id = record.getId();
         Buffer buffer = window.getOffsettedBuffer( id );
-        if ( record.inUse() )
+        if ( record.inUse() || force )
         {
             // Set up the record header
             short prevModifier = record.getPrevProp() == Record.NO_NEXT_RELATIONSHIP.intValue() ? 0
