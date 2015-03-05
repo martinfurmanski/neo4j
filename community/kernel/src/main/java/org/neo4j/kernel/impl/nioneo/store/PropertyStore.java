@@ -189,7 +189,18 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
         setRecovered();
         try
         {
-            updateRecord( record );
+            PersistenceWindow window = acquireWindow( record.getId(),
+                    OperationType.WRITE );
+            try
+            {
+                boolean force = recovered;
+                updateRecord( record, window, force );
+            }
+            finally
+            {
+                releaseWindow( window );
+            }
+
             registerIdFromUpdateRecord( record.getId() );
         }
         finally
