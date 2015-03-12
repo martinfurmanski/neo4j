@@ -45,7 +45,7 @@ import org.neo4j.kernel.logging.LogMarker;
 public class TestLogger extends StringLogger
 {
 
-    private enum Level
+    public enum Level
     {
         DEBUG,
         INFO,
@@ -84,6 +84,11 @@ public class TestLogger extends StringLogger
         public void accept( Visitor<LogCall,RuntimeException> visitor )
         {
             visitor.visit( this );
+        }
+
+        public Level level()
+        {
+            return level;
         }
 
         @Override
