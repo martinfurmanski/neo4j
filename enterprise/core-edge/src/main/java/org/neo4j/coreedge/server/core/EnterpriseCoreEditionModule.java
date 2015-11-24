@@ -41,7 +41,6 @@ import org.neo4j.coreedge.raft.membership.MembershipWaiter;
 import org.neo4j.coreedge.raft.replication.id.ReplicatedIdAllocationStateMachine;
 import org.neo4j.coreedge.raft.replication.id.ReplicatedIdGeneratorFactory;
 import org.neo4j.coreedge.raft.replication.id.ReplicatedIdRangeAcquirer;
-import org.neo4j.coreedge.raft.replication.session.GlobalSessionTracker;
 import org.neo4j.coreedge.raft.replication.session.LocalSessionPool;
 import org.neo4j.coreedge.raft.replication.token.ReplicatedLabelTokenHolder;
 import org.neo4j.coreedge.raft.replication.token.ReplicatedPropertyKeyTokenHolder;
@@ -91,6 +90,7 @@ import org.neo4j.kernel.Version;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.CommitProcessFactory;
 import org.neo4j.kernel.impl.api.SchemaWriteGuard;
+import org.neo4j.kernel.impl.api.TransactionHeaderInformation;
 import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
 import org.neo4j.kernel.impl.api.index.RemoveOrphanConstraintIndexesOnStartup;
 import org.neo4j.kernel.impl.enterprise.EnterpriseConstraintSemantics;
@@ -181,9 +181,9 @@ public class EnterpriseCoreEditionModule
                 new RaftOutbound( loggingOutbound ) );
 
         LocalSessionPool localSessionPool = new LocalSessionPool( myself );
-        GlobalSessionTracker sessionTracker = new GlobalSessionTracker();
 
-        commitProcessFactory = createCommitProcessFactory( replicator, localSessionPool, sessionTracker, dependencies );
+
+        commitProcessFactory = createCommitProcessFactory( replicator, localSessionPool, dependencies );
 
         ReplicatedIdAllocationStateMachine idAllocationStateMachine = new ReplicatedIdAllocationStateMachine( myself );
         replicator.subscribe( idAllocationStateMachine );
@@ -196,7 +196,7 @@ public class EnterpriseCoreEditionModule
 
         long electionTimeout = config.get( CoreEdgeClusterSettings.leader_election_timeout );
         MembershipWaiter<CoreMember> membershipWaiter =
-                new MembershipWaiter<>( myself, platformModule.jobScheduler, electionTimeout );
+                new MembershipWaiter<>( myself, platformModule.jobScheduler, electionTimeout*4 );
 
         CoreServiceRegistry coreServices = new CoreServiceRegistry( SYSTEM_CLOCK );
 
@@ -287,9 +287,8 @@ public class EnterpriseCoreEditionModule
 
     }
 
-    public static CommitProcessFactory createCommitProcessFactory( final Replicator replicator,
+    private static CommitProcessFactory createCommitProcessFactory( final Replicator replicator,
                                                                    final LocalSessionPool localSessionPool, final
-                                                                   GlobalSessionTracker sessionTracker, final
                                                                    Dependencies dependencies )
     {
         return ( appender, applier, indexUpdatesValidator, config ) -> {
@@ -297,8 +296,15 @@ public class EnterpriseCoreEditionModule
                     new TransactionRepresentationCommitProcess( appender, applier, indexUpdatesValidator );
             dependencies.satisfyDependencies( localCommit );
 
+            StaleTransactionRejectingCommitProcess staleTransactionFilter = new StaleTransactionRejectingCommitProcess( localCommit );
+
             ReplicatedTransactionStateMachine replicatedTxListener = new ReplicatedTransactionStateMachine(
-                    localCommit, sessionTracker, localSessionPool.getGlobalSession() );
+                    staleTransactionFilter, localSessionPool.getGlobalSession(), dependencies );
+
+            dependencies.satisfyDependencies( replicatedTxListener );
+
+            replicator.subscribe( staleTransactionFilter );
+            replicator.subscribe( replicatedTxListener );
 
             return new ReplicatedTransactionCommitProcess( replicator, localSessionPool, replicatedTxListener );
         };
@@ -398,7 +404,7 @@ public class EnterpriseCoreEditionModule
 
     protected TransactionHeaderInformationFactory createHeaderInformationFactory()
     {
-        return TransactionHeaderInformationFactory.DEFAULT;
+        return () -> new TransactionHeaderInformation( -1, -1, new byte[0] );
     }
 
     protected void registerRecovery( final String editionName, LifeSupport life,

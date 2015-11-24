@@ -21,40 +21,47 @@ package org.neo4j.coreedge.raft.replication.tx;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 import org.neo4j.concurrent.CompletableFuture;
-import org.neo4j.coreedge.raft.locks.CoreServiceAssignment;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.replication.Replicator;
 import org.neo4j.coreedge.raft.replication.session.GlobalSession;
 import org.neo4j.coreedge.raft.replication.session.GlobalSessionTracker;
 import org.neo4j.coreedge.raft.replication.session.LocalOperationId;
-import org.neo4j.graphdb.TransientTransactionFailureException;
+import org.neo4j.graphdb.TransientFailureException;
+import org.neo4j.kernel.NeoStoreDataSource;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionApplicationMode;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
+import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
+import org.neo4j.kernel.impl.transaction.log.IOCursor;
+import org.neo4j.kernel.impl.transaction.log.LogicalTransactionStore;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
+import org.neo4j.kernel.impl.util.Dependencies;
 
 public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedContentListener
 {
-    private final TransactionCommitProcess localCommitProcess;
     private final GlobalSessionTracker sessionTracker;
     private final GlobalSession myGlobalSession;
-
+    private final Dependencies dependencies;
+    private final TransactionCommitProcess commitProcess;
     private final Map<LocalOperationId, FutureTxId> outstanding = new ConcurrentHashMap<>();
-    private long lastCommittedTxId; // Maintains the last committed tx id, used to set the next field
-    private long lastTxIdForPreviousAssignment; // Maintains the last txid committed under the previous service assignment
+    private long lastIndexCommitted = -1;
 
-    public ReplicatedTransactionStateMachine( TransactionCommitProcess localCommitProcess, GlobalSessionTracker
-            sessionTracker, GlobalSession myGlobalSession )
+    private boolean recoveryMode;
+
+    public ReplicatedTransactionStateMachine( TransactionCommitProcess commitProcess,
+            GlobalSession myGlobalSession, Dependencies dependencies )
     {
-        this.localCommitProcess = localCommitProcess;
-        this.sessionTracker = sessionTracker;
+        this.commitProcess = commitProcess;
         this.myGlobalSession = myGlobalSession;
+        this.dependencies = dependencies;
+        this.sessionTracker = new GlobalSessionTracker();
     }
 
     public Future<Long> getFutureTxId( LocalOperationId localOperationId )
@@ -65,65 +72,29 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
     }
 
     @Override
-    public void onReplicated( ReplicatedContent content )
+    public synchronized void onReplicated( ReplicatedContent content, long index )
     {
         if ( content instanceof ReplicatedTransaction )
         {
-            handleTransaction( (ReplicatedTransaction) content );
-        }
-        else if ( content instanceof CoreServiceAssignment )
-        {
-            // This essentially signifies a leader switch. We should properly name the content class
-            lastTxIdForPreviousAssignment = lastCommittedTxId;
+            handleTransaction( (ReplicatedTransaction) content, index );
         }
     }
 
-    private void handleTransaction( ReplicatedTransaction replicatedTransaction )
+    private void handleTransaction( ReplicatedTransaction replicatedTransaction, long index )
     {
         try
         {
-            synchronized ( this )
+            if ( sessionTracker.validateAndTrackOperation( replicatedTransaction.globalSession(),
+                    replicatedTransaction.localOperationId() ) )
             {
-
-                if ( sessionTracker.validateAndTrackOperation( replicatedTransaction.globalSession(),
-                        replicatedTransaction.localOperationId() ) )
+                if ( recoveryMode )
                 {
-                    TransactionRepresentation tx = ReplicatedTransactionFactory.extractTransactionRepresentation(
-                            replicatedTransaction );
-                    boolean shouldReject = false;
-                    if ( tx.getLatestCommittedTxWhenStarted() < lastTxIdForPreviousAssignment )
-                    {
-                        // This means the transaction started before the last transaction for the previous term. Reject.
-                        shouldReject = true;
-                    }
-
-                    long txId = -1;
-                    if ( !shouldReject )
-                    {
-                        txId = localCommitProcess.commit( new TransactionToApply( tx ), CommitEvent.NULL,
-                                TransactionApplicationMode.EXTERNAL );
-                        lastCommittedTxId = txId;
-                    }
-
-                    if ( replicatedTransaction.globalSession().equals( myGlobalSession ) )
-                    {
-                        CompletableFuture<Long> future = outstanding.remove( replicatedTransaction.localOperationId() );
-                        if ( future != null )
-                        {
-                            if ( shouldReject )
-                            {
-                                future.completeExceptionally( new TransientTransactionFailureException(
-                                        "Attempt to commit transaction that was started on a different leader term. " +
-                                                "Please retry the transaction." ) );
-                            }
-                            else
-                            {
-                                future.complete( txId );
-                            }
-                        }
-                    }
+                    recoveryVersion( replicatedTransaction, index );
                 }
-
+                else
+                {
+                    normalVersion( replicatedTransaction, index );
+                }
             }
         }
         catch ( TransactionFailureException | IOException e )
@@ -132,6 +103,86 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
                     "committed to the RAFT log. This server cannot process later transactions and needs to be " +
                     "restarted once the underlying cause has been addressed.", e );
         }
+    }
+
+    private void recoveryVersion( ReplicatedTransaction replicatedTransaction, long index ) throws IOException, TransactionFailureException
+    {
+        if ( index <= lastIndexCommitted )
+        {
+            TransactionRepresentation tx = ReplicatedTransactionFactory.extractTransactionRepresentation(
+                    replicatedTransaction, longToBytes( index ) );
+
+            try
+            {
+                commitProcess.commit( new TransactionToApply( tx ), CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );
+            }
+            catch ( TransientFailureException e )
+            {
+                // TODO: Consider logging?
+            }
+        }
+    }
+
+    private void normalVersion( ReplicatedTransaction replicatedTransaction, long index ) throws IOException, TransactionFailureException
+    {
+        TransactionRepresentation tx = ReplicatedTransactionFactory.extractTransactionRepresentation(
+                replicatedTransaction, longToBytes( index ) );
+
+        Optional<CompletableFuture<Long>> future = Optional.empty(); // A missing future means the transaction does not belong to this instance
+        if ( replicatedTransaction.globalSession().equals( myGlobalSession ) )
+        {
+            future = Optional.of( outstanding.remove( replicatedTransaction.localOperationId() ) );
+        }
+
+        try
+        {
+            long txId = commitProcess.commit( new TransactionToApply( tx ), CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );
+            future.ifPresent( txFuture -> txFuture.complete( txId ) );
+        }
+        catch ( TransientFailureException e )
+        {
+            future.ifPresent( txFuture -> txFuture.completeExceptionally( e ) );
+        }
+    }
+
+    public void setRecoveryMode( boolean enabled )
+    {
+        if ( enabled )
+        {
+            lastIndexCommitted = readLastIndexCommitted();
+        }
+        recoveryMode = enabled;
+    }
+
+    public long readLastIndexCommitted()
+    {
+        long lastTxId = dependencies.resolveDependency( NeoStoreDataSource.class ).getNeoStores().getMetaDataStore().getLastCommittedTransactionId();
+
+        if ( lastTxId == 1 )
+        {
+            return -1;
+        }
+
+        IOCursor<CommittedTransactionRepresentation> transactions = null;
+        byte[] lastHeaderFound;
+        try
+        {
+            transactions = dependencies.resolveDependency(
+                    LogicalTransactionStore.class ).getTransactions( lastTxId );
+            lastHeaderFound = null;
+            while ( transactions.next() )
+            {
+                CommittedTransactionRepresentation committedTransactionRepresentation = transactions.get();
+                lastHeaderFound = committedTransactionRepresentation.getStartEntry().getAdditionalHeader();
+            }
+        }
+        catch ( Exception e )
+        {
+            e.printStackTrace();
+            throw new RuntimeException( e );
+        }
+
+        return bytesToLong( lastHeaderFound );
     }
 
     private class FutureTxId extends CompletableFuture<Long>
@@ -153,5 +204,29 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
             outstanding.remove( localOperationId );
             return true;
         }
+    }
+
+    public static byte[] longToBytes( long theLong )
+    {
+        final int bytesPerLong = Long.BYTES / Byte.BYTES;
+        byte[] b = new byte[bytesPerLong];
+        for ( int i = bytesPerLong - 1; i > 0; i-- )
+        {
+            b[i] = (byte) theLong;
+            theLong >>>= 8;
+        }
+        b[0] = (byte) theLong;
+        return b;
+    }
+
+    public static long bytesToLong(byte[] bytes )
+    {
+        long result = 0;
+        for ( int i = 0; i < 8; i++ )
+        {
+            result <<= 8;
+            result ^= bytes[i] & 0xFF;
+        }
+        return result;
     }
 }

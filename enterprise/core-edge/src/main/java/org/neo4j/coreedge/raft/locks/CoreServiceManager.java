@@ -62,7 +62,7 @@ public class CoreServiceManager implements Listener<LeadershipChange<CoreMember>
     }
 
     @Override
-    public void onReplicated( ReplicatedContent content )
+    public void onReplicated( ReplicatedContent content, long index )
     {
         if ( content instanceof CoreServiceAssignment )
         {

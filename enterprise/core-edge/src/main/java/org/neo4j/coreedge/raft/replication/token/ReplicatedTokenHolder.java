@@ -212,7 +212,7 @@ public abstract class ReplicatedTokenHolder<TOKEN extends Token, RECORD extends 
     }
 
     @Override
-    public void onReplicated( ReplicatedContent content )
+    public void onReplicated( ReplicatedContent content, long index )
     {
         if ( content instanceof ReplicatedTokenRequest && ((ReplicatedTokenRequest) content).type().equals( type ) )
         {

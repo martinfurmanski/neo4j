@@ -129,7 +129,7 @@ public class ReplicatedTokenHolderTest
                 idGeneratorFactory, dependencies );
 
         tokenHolder.start();
-        tokenHolder.onReplicated( new ReplicatedTokenRequest( TokenType.LABEL, "Person", ReplicatedTokenRequestSerializer.createCommandBytes( expectedCommands ) ) );
+        tokenHolder.onReplicated( new ReplicatedTokenRequest( TokenType.LABEL, "Person", ReplicatedTokenRequestSerializer.createCommandBytes( expectedCommands ) ), 0 );
 
         // when
         int tokenId = tokenHolder.getOrCreateId( "Person" );
@@ -209,9 +209,9 @@ public class ReplicatedTokenHolderTest
             {
                 if ( otherToken != null )
                 {
-                    listener.onReplicated( otherToken );
+                    listener.onReplicated( otherToken, 0 );
                 }
-                listener.onReplicated( content );
+                listener.onReplicated( content, 0 );
             }
         }
 
@@ -237,7 +237,7 @@ public class ReplicatedTokenHolderTest
         {
             for ( ReplicatedContentListener listener : listeners )
             {
-                listener.onReplicated( content );
+                listener.onReplicated( content, 0 );
             }
         }
 

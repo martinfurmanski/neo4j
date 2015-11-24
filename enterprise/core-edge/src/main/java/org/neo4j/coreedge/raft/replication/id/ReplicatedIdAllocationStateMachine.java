@@ -88,7 +88,7 @@ public class ReplicatedIdAllocationStateMachine implements Replicator.Replicated
     }
 
     @Override
-    public synchronized void onReplicated( ReplicatedContent content )
+    public synchronized void onReplicated( ReplicatedContent content, long index )
     {
         if ( content instanceof ReplicatedIdAllocationRequest )
         {

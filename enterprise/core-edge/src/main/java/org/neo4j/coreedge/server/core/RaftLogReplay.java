@@ -34,6 +34,7 @@ public class RaftLogReplay extends LifecycleAdapter
     @Override
     public void start() throws Throwable
     {
+        System.out.println("NOW I SHALL PLAY YOU THE SONG OF MY PEOPLE");
         raftLog.replay();
     }
 }

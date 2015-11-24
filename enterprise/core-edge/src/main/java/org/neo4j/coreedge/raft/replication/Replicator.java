@@ -29,7 +29,7 @@ public interface Replicator
 
     interface ReplicatedContentListener
     {
-        void onReplicated( ReplicatedContent content );
+        void onReplicated( ReplicatedContent content, long index );
     }
 
     class ReplicationFailedException extends Exception

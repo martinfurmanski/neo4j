@@ -59,7 +59,7 @@ public class RaftLogAdversarialTest
             }
 
             @Override
-            public void onCommitted( ReplicatedContent raftableContent )
+            public void onCommitted( ReplicatedContent raftableContent, long index )
             {
                 throw new RuntimeException( "Fail to accept the content" );
             }

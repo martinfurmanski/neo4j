@@ -50,7 +50,7 @@ public class CoreServerStartupProcess
                                                  RaftLogReplay raftLogReplay )
     {
         LifeSupport services = new LifeSupport();
-        services.add( deleteStoreOnStartUp );
+        //services.add( deleteStoreOnStartUp );
         services.add( dataSourceManager );
         services.add( idGeneratorFactory );
         services.add( raftLogReplay );

@@ -81,7 +81,7 @@ public class RaftReplicatorTest
         private CompletableFuture<ReplicatedContent> content = new CompletableFuture<>();
 
         @Override
-        public void onReplicated( ReplicatedContent value )
+        public void onReplicated( ReplicatedContent value, long index )
         {
             this.content.complete( value );
         }

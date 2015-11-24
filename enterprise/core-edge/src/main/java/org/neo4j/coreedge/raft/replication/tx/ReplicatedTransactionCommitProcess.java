@@ -51,7 +51,6 @@ public class ReplicatedTransactionCommitProcess extends LifecycleAdapter impleme
         this.sessionPool = sessionPool;
         this.replicatedTxListener = replicatedTxListener;
         this.replicator = replicator;
-        replicator.subscribe( this.replicatedTxListener );
     }
 
     @Override

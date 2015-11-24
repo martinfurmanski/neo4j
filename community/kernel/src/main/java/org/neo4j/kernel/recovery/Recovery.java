@@ -69,9 +69,11 @@ public class Recovery extends LifecycleAdapter
     @Override
     public void init() throws Throwable
     {
+        System.out.println("RECOVERY START");
         LogPosition recoveryPosition = spi.getPositionToRecoverFrom();
         if ( LogPosition.UNSPECIFIED.equals( recoveryPosition ) )
         {
+            System.out.println("NOTHING TO RECOVER");
             return;
         }
         Iterator<LogVersionedStoreChannel> logFiles = spi.getLogFiles( recoveryPosition.getLogVersion() );
@@ -90,6 +92,7 @@ public class Recovery extends LifecycleAdapter
         recoveredLog = true;
         monitor.logRecovered( recoveryPosition );
         spi.forceEverything();
+        System.out.println("RECOVERY FINISH");
     }
 
     @Override
