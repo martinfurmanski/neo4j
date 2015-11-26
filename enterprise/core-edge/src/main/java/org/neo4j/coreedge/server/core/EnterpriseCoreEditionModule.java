@@ -262,7 +262,7 @@ public class EnterpriseCoreEditionModule
                 platformModule.dataSourceManager, replicatedIdGeneratorFactory, raft, raftServer,
                 catchupServer, raftTimeoutService, membershipWaiter,
                 config.get( CoreEdgeClusterSettings.join_catch_up_timeout ) ,
-                new DeleteStoreOnStartUp( localDatabase ), new RaftLogReplay( raftLog )
+                new DeleteStoreOnStartUp( localDatabase ), new RaftLogReplay( raftLog, dependencies )
         ));
     }
 

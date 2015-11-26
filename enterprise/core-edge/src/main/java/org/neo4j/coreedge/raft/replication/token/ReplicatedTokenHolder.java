@@ -66,6 +66,8 @@ public abstract class ReplicatedTokenHolder<TOKEN extends Token, RECORD extends 
     private final TokenType type;
 
     private final TokenFutures tokenFutures = new TokenFutures();
+    private long lastCommittedIndex;
+    private boolean recovery;
 
     // TODO: Clean up all the resolving, which now happens every time with special selection strategies.
 
@@ -214,6 +216,10 @@ public abstract class ReplicatedTokenHolder<TOKEN extends Token, RECORD extends 
     @Override
     public void onReplicated( ReplicatedContent content, long index )
     {
+        if ( recovery && index <= lastCommittedIndex )
+        {
+            return;
+        }
         if ( content instanceof ReplicatedTokenRequest && ((ReplicatedTokenRequest) content).type().equals( type ) )
         {
             ReplicatedTokenRequest tokenRequest = (ReplicatedTokenRequest) content;
@@ -244,7 +250,7 @@ public abstract class ReplicatedTokenHolder<TOKEN extends Token, RECORD extends 
         int tokenId = extractTokenId( commands );
 
         PhysicalTransactionRepresentation representation = new PhysicalTransactionRepresentation( commands );
-        representation.setHeader( new byte[0], 0, 0, 0, 0l, 0l, 0 );
+        representation.setHeader( new byte[0], 0, 0, 0, 0L, 0L, 0 );
 
         TransactionCommitProcess commitProcess = dependencies.resolveDependency(
                 TransactionRepresentationCommitProcess.class );
@@ -279,4 +285,15 @@ public abstract class ReplicatedTokenHolder<TOKEN extends Token, RECORD extends 
     protected abstract TokenStore<RECORD,TOKEN> resolveStore();
 
     protected abstract Command.TokenCommand<RECORD> createCommand();
+
+    public void setRecoveryMode( long lastCommittedIndex )
+    {
+        this.lastCommittedIndex = lastCommittedIndex;
+        this.recovery = true;
+    }
+
+    public void unsetRecoveryMode()
+    {
+        this.recovery = false;
+    }
 }

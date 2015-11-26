@@ -145,44 +145,15 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
         }
     }
 
-    public void setRecoveryMode( boolean enabled )
+    public void setRecoveryMode( long lastIndexCommitted )
     {
-        if ( enabled )
-        {
-            lastIndexCommitted = readLastIndexCommitted();
-        }
-        recoveryMode = enabled;
+        this.lastIndexCommitted = lastIndexCommitted;
+        recoveryMode = true;
     }
 
-    public long readLastIndexCommitted()
+    public void unsetRecoveryMode()
     {
-        long lastTxId = dependencies.resolveDependency( NeoStoreDataSource.class ).getNeoStores().getMetaDataStore().getLastCommittedTransactionId();
-
-        if ( lastTxId == 1 )
-        {
-            return -1;
-        }
-
-        IOCursor<CommittedTransactionRepresentation> transactions = null;
-        byte[] lastHeaderFound;
-        try
-        {
-            transactions = dependencies.resolveDependency(
-                    LogicalTransactionStore.class ).getTransactions( lastTxId );
-            lastHeaderFound = null;
-            while ( transactions.next() )
-            {
-                CommittedTransactionRepresentation committedTransactionRepresentation = transactions.get();
-                lastHeaderFound = committedTransactionRepresentation.getStartEntry().getAdditionalHeader();
-            }
-        }
-        catch ( Exception e )
-        {
-            e.printStackTrace();
-            throw new RuntimeException( e );
-        }
-
-        return bytesToLong( lastHeaderFound );
+        recoveryMode = false;
     }
 
     private class FutureTxId extends CompletableFuture<Long>
