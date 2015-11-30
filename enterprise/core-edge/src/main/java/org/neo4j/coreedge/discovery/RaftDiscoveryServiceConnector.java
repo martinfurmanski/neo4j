@@ -21,9 +21,9 @@ package org.neo4j.coreedge.discovery;
 
 import java.util.Set;
 
+import org.neo4j.coreedge.BootstrapException;
 import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.coreedge.raft.RaftInstance;
-import org.neo4j.coreedge.raft.membership.CoreMemberSet;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 public class RaftDiscoveryServiceConnector extends LifecycleAdapter implements CoreDiscoveryService.Listener
@@ -31,15 +31,14 @@ public class RaftDiscoveryServiceConnector extends LifecycleAdapter implements C
     private final CoreDiscoveryService discoveryService;
     private final RaftInstance<CoreMember> raftInstance;
 
-    public RaftDiscoveryServiceConnector( CoreDiscoveryService discoveryService,
-                                            RaftInstance<CoreMember> raftInstance )
+    public RaftDiscoveryServiceConnector( CoreDiscoveryService discoveryService, RaftInstance<CoreMember> raftInstance )
     {
         this.discoveryService = discoveryService;
         this.raftInstance = raftInstance;
     }
 
     @Override
-    public void start() throws RaftInstance.BootstrapException
+    public void start() throws BootstrapException
     {
         discoveryService.addMembershipListener( this );
 
@@ -48,7 +47,7 @@ public class RaftDiscoveryServiceConnector extends LifecycleAdapter implements C
 
         if ( clusterTopology.bootstrappable() )
         {
-            raftInstance.bootstrapWithInitialMembers( new CoreMemberSet( initialMembers ) );
+            raftInstance.bootstrapWithInitialMembers( initialMembers );
         }
 
         onTopologyChange( clusterTopology );
@@ -63,6 +62,17 @@ public class RaftDiscoveryServiceConnector extends LifecycleAdapter implements C
     @Override
     public void onTopologyChange( ClusterTopology clusterTopology )
     {
+        if ( clusterTopology.bootstrappable() )
+        {
+            try
+            {
+                raftInstance.bootstrapWithInitialMembers( clusterTopology.getMembers() );
+            }
+            catch ( BootstrapException e )
+            {
+                e.printStackTrace();
+            }
+        }
         raftInstance.setTargetMembershipSet( clusterTopology.getMembers() );
     }
 }

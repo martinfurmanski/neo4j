@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import org.neo4j.coreedge.BootstrapException;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogEntry;
@@ -35,7 +36,6 @@ import org.neo4j.coreedge.server.RaftTestMember;
 import org.neo4j.coreedge.server.RaftTestMemberSetBuilder;
 import org.neo4j.coreedge.server.core.RaftStorageExceptionHandler;
 import org.neo4j.helpers.Clock;
-import org.neo4j.helpers.FakeClock;
 import org.neo4j.helpers.TickingClock;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -425,7 +425,7 @@ public class RaftInstanceTest
             raft.bootstrapWithInitialMembers( new RaftTestGroup( asSet( myself, member1, member2 ) ) );
             fail( "Contract expects exception so that others can take remedial action" );
         }
-        catch ( RaftInstance.BootstrapException e )
+        catch ( BootstrapException e )
         {
             // then
             assertTrue( raftStorageExceptionHandler.hasPanicked() );

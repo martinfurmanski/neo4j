@@ -23,6 +23,8 @@ import java.io.Serializable;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 
+import org.neo4j.coreedge.BootstrapException;
+import org.neo4j.coreedge.BootstrappableMembership;
 import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogEntry;
 import org.neo4j.coreedge.raft.log.RaftStorageException;
@@ -67,7 +69,7 @@ import static org.neo4j.coreedge.raft.roles.Role.LEADER;
  *
  * @param <MEMBER> The membership type.
  */
-public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.MessageHandler
+public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.MessageHandler, BootstrappableMembership<MEMBER>
 {
     public enum Timeouts implements RenewableTimeoutService.TimeoutName
     {
@@ -88,6 +90,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
 
     private final RaftStorageExceptionHandler raftStorageExceptionHandler;
     private Clock clock;
+    private final RaftGroup.Builder<MEMBER> memberSetBuilder;
 
     private final Outbound<MEMBER> outbound;
     private final Log log;
@@ -102,7 +105,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
                          LogProvider logProvider, RaftMembershipManager<MEMBER> membershipManager,
                          RaftLogShippingManager<MEMBER> logShipping,
                          RaftStorageExceptionHandler raftStorageExceptionHandler,
-                         Clock clock )
+                         Clock clock, RaftGroup.Builder<MEMBER> memberSetBuilder )
 
     {
         this.myself = myself;
@@ -117,6 +120,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
         this.logShipping = logShipping;
         this.raftStorageExceptionHandler = raftStorageExceptionHandler;
         this.clock = clock;
+        this.memberSetBuilder = memberSetBuilder;
         this.log = logProvider.getLog( getClass() );
 
         this.membershipManager = membershipManager;
@@ -142,20 +146,21 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
                 } );
     }
 
-    /**
-     * All members must be bootstrapped with the exact same set of initial members. Bootstrapping
-     * requires an empty log as input and will seed it with the initial group entry in term 0.
-     *
-     * @param memberSet The other members.
-     */
-    public synchronized void bootstrapWithInitialMembers( RaftGroup<MEMBER> memberSet ) throws BootstrapException
+    @Override
+    public boolean isBootstrapped()
     {
-        if ( entryLog.appendIndex() >= 0 )
+        return entryLog.appendIndex() < 0;
+    }
+
+    @Override
+    public synchronized void bootstrapWithInitialMembers( Set<MEMBER> initialMemberSet ) throws BootstrapException
+    {
+        if ( isBootstrapped() )
         {
-            return;
+            throw new IllegalStateException( "Thou shalt not bootstrap with stuff in the log." );
         }
 
-        RaftLogEntry membershipLogEntry = new RaftLogEntry( 0, memberSet );
+        RaftLogEntry membershipLogEntry = new RaftLogEntry( 0, memberSetBuilder.build( initialMemberSet ) );
 
         try
         {
@@ -283,14 +288,6 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
     public String toString()
     {
         return format( "RaftInstance{role=%s, term=%d, currentMembers=%s}", currentRole, term(), votingMembers() );
-    }
-
-    public static class BootstrapException extends Exception
-    {
-        public BootstrapException( Throwable cause )
-        {
-            super( cause );
-        }
     }
 
     public long term()

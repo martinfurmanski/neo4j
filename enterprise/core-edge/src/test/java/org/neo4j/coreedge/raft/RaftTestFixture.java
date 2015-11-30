@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.neo4j.coreedge.BootstrapException;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.membership.RaftTestGroup;
@@ -143,7 +144,7 @@ public class RaftTestFixture
             }
         }
 
-        public void bootstrapWithInitialMembers( RaftTestGroup raftTestGroup ) throws RaftInstance.BootstrapException
+        public void bootstrapWithInitialMembers( RaftTestGroup raftTestGroup ) throws BootstrapException
         {
             for ( MemberFixture memberFixture : memberMap.values() )
             {

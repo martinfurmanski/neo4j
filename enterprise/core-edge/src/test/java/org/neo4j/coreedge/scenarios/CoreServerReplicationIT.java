@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.neo4j.cluster.InstanceId;
 import org.neo4j.coreedge.discovery.Cluster;
+import org.neo4j.coreedge.discovery.simple.SimpleDiscoveryServiceFactory;
 import org.neo4j.coreedge.server.CoreEdgeClusterSettings;
 import org.neo4j.coreedge.server.core.CoreGraphDatabase;
 import org.neo4j.function.ThrowingSupplier;
@@ -84,7 +85,8 @@ public class CoreServerReplicationIT
     {
         // given
         File dbDir = dir.directory();
-        cluster = Cluster.start( dbDir, 3, 0 );
+        System.out.println(dbDir);
+        cluster = Cluster.start( dbDir, 3, 0, new SimpleDiscoveryServiceFactory() );
 
         // when
         GraphDatabaseService coreDB = cluster.findLeader( 5000 );

@@ -19,11 +19,12 @@
  */
 package org.neo4j.coreedge.server;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 import static java.lang.String.format;
 
-public class CoreMember
+public class CoreMember implements Comparable<CoreMember>
 {
     private final AdvertisedSocketAddress coreAddress;
     private final AdvertisedSocketAddress raftAddress;
@@ -69,6 +70,17 @@ public class CoreMember
     public AdvertisedSocketAddress getRaftAddress()
     {
         return raftAddress;
+    }
+
+    @Override
+    public int compareTo( CoreMember o )
+    {
+        int val = coreAddress.compareTo( o.coreAddress );
+        if( val == 0)
+        {
+            val = raftAddress.compareTo( o.raftAddress );
+        }
+        return val;
     }
 }
 

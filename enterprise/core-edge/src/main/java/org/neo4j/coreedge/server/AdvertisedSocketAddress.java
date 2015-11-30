@@ -22,7 +22,7 @@ package org.neo4j.coreedge.server;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 
-public class AdvertisedSocketAddress
+public class AdvertisedSocketAddress implements Comparable<AdvertisedSocketAddress>
 {
     private final InetSocketAddress address;
 
@@ -66,5 +66,18 @@ public class AdvertisedSocketAddress
     public InetSocketAddress socketAddress()
     {
         return address;
+    }
+
+    @Override
+    public int compareTo( AdvertisedSocketAddress o )
+    {
+        int val = address.getHostString().compareTo( o.socketAddress().getHostString() );
+
+        if ( val == 0 )
+        {
+            val = Integer.compare( address.getPort(), o.socketAddress().getPort() );
+        }
+
+        return val;
     }
 }
