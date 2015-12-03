@@ -107,10 +107,11 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
 
     private void recoveryVersion( ReplicatedTransaction replicatedTransaction, long index ) throws IOException, TransactionFailureException
     {
-        if ( index <= lastIndexCommitted )
+        if ( index > lastIndexCommitted )
         {
+            byte[] extraHeader = longToBytes( index );
             TransactionRepresentation tx = ReplicatedTransactionFactory.extractTransactionRepresentation(
-                    replicatedTransaction, longToBytes( index ) );
+                    replicatedTransaction, extraHeader );
 
             try
             {
@@ -125,8 +126,9 @@ public class ReplicatedTransactionStateMachine implements Replicator.ReplicatedC
 
     private void normalVersion( ReplicatedTransaction replicatedTransaction, long index ) throws IOException, TransactionFailureException
     {
+        byte[] extraHeader = longToBytes( index );
         TransactionRepresentation tx = ReplicatedTransactionFactory.extractTransactionRepresentation(
-                replicatedTransaction, longToBytes( index ) );
+                replicatedTransaction, extraHeader );
 
         Optional<CompletableFuture<Long>> future = Optional.empty(); // A missing future means the transaction does not belong to this instance
         if ( replicatedTransaction.globalSession().equals( myGlobalSession ) )
