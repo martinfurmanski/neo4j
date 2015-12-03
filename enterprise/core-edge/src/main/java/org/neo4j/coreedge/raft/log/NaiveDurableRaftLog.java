@@ -212,6 +212,15 @@ public class NaiveDurableRaftLog implements RaftLog
         {
             actualNewCommitIndex = appendIndex;
         }
+        // INVARIANT: If newCommitIndex was greater than appendIndex, commitIndex is equal to appendIndex
+        try
+        {
+            storeCommitIndex( actualNewCommitIndex );
+        }
+        catch ( IOException e )
+        {
+            throw new RaftStorageException( "Failed to commit", e );
+        }
 
         for ( long index = this.commitIndex + 1; index <= actualNewCommitIndex; index++ )
         {
@@ -221,15 +230,6 @@ public class NaiveDurableRaftLog implements RaftLog
                 listener.onCommitted( content, index );
             }
             this.commitIndex = actualNewCommitIndex;
-        }
-        // INVARIANT: If newCommitIndex was greater than appendIndex, commitIndex is equal to appendIndex
-        try
-        {
-            storeCommitIndex( actualNewCommitIndex );
-        }
-        catch ( IOException e )
-        {
-            throw new RaftStorageException( "Failed to commit", e );
         }
     }
 
