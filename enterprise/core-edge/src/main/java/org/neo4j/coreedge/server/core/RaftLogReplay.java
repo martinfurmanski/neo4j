@@ -48,7 +48,32 @@ public class RaftLogReplay extends LifecycleAdapter
     @Override
     public void start() throws Throwable
     {
-        System.out.println("NOW I SHALL PLAY YOU THE SONG OF MY PEOPLE");
+        long lastCommittedIndex = getLastCommittedIndex();
+
+        ReplicatedTransactionStateMachine replicatedTransactionStateMachine = dependencies.resolveDependency(
+                ReplicatedTransactionStateMachine.class );
+        ReplicatedTokenHolder relTypeTokenHolder = dependencies.resolveDependency( ReplicatedRelationshipTypeTokenHolder
+                .class );
+        ReplicatedTokenHolder labelTokenHolder = dependencies.resolveDependency( ReplicatedLabelTokenHolder.class );
+        ReplicatedTokenHolder propKeyTokenHolder = dependencies.resolveDependency( ReplicatedPropertyKeyTokenHolder.class );
+
+        replicatedTransactionStateMachine.setRecoveryMode( lastCommittedIndex );
+        relTypeTokenHolder.setRecoveryMode( lastCommittedIndex );
+        labelTokenHolder.setRecoveryMode( lastCommittedIndex );
+        propKeyTokenHolder.setRecoveryMode( lastCommittedIndex );
+
+        long start = System.currentTimeMillis();
+        raftLog.replay();
+        System.out.println("Replay done, took " + (System.currentTimeMillis() - start) + " ms");
+
+        replicatedTransactionStateMachine.unsetRecoveryMode();
+        relTypeTokenHolder.unsetRecoveryMode();
+        labelTokenHolder.unsetRecoveryMode();
+        propKeyTokenHolder.unsetRecoveryMode();
+    }
+
+    private long getLastCommittedIndex()
+    {
         long lastCommittedIndex;
         long lastTxId = dependencies.resolveDependency( NeoStoreDataSource.class ).getNeoStores().getMetaDataStore().getLastCommittedTransactionId();
 
@@ -79,26 +104,6 @@ public class RaftLogReplay extends LifecycleAdapter
         }
 
         System.out.println("The last index has been determined to be " + lastCommittedIndex );
-
-        ReplicatedTransactionStateMachine replicatedTransactionStateMachine = dependencies.resolveDependency(
-                ReplicatedTransactionStateMachine.class );
-        ReplicatedTokenHolder relTypeTokenHolder = dependencies.resolveDependency( ReplicatedRelationshipTypeTokenHolder
-                .class );
-        ReplicatedTokenHolder labelTokenHolder = dependencies.resolveDependency( ReplicatedLabelTokenHolder.class );
-        ReplicatedTokenHolder propKeyTokenHolder = dependencies.resolveDependency( ReplicatedPropertyKeyTokenHolder.class );
-
-        replicatedTransactionStateMachine.setRecoveryMode( lastCommittedIndex );
-        relTypeTokenHolder.setRecoveryMode( lastCommittedIndex );
-        labelTokenHolder.setRecoveryMode( lastCommittedIndex );
-        propKeyTokenHolder.setRecoveryMode( lastCommittedIndex );
-
-        long start = System.currentTimeMillis();
-        raftLog.replay();
-        System.out.println("Replay done, took " + (System.currentTimeMillis() - start) + " ms");
-
-        replicatedTransactionStateMachine.unsetRecoveryMode();
-        relTypeTokenHolder.unsetRecoveryMode();
-        labelTokenHolder.unsetRecoveryMode();
-        propKeyTokenHolder.unsetRecoveryMode();
+        return lastCommittedIndex;
     }
 }
