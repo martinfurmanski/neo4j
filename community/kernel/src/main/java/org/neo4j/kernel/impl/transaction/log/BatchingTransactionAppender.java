@@ -327,16 +327,16 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
         }
         // Force the writer outside of the lock.
         // This allows other threads access to the buffer while the writer is being forced.
-        try
-        {
-            flushable.flush();
-        }
-        catch ( ClosedChannelException ignored )
-        {
-            // This is ok, we were already successful in emptying the buffer, so the channel being closed here means
-            // that some other thread is rotating the log and has closed the underlying channel. But since we were
-            // successful in emptying the buffer *UNDER THE LOCK* we know that the rotating thread included the changes
-            // we emptied into the channel, and thus it is already flushed by that thread.
-        }
+//        try
+//        {
+//            flushable.flush();
+//        }
+//        catch ( ClosedChannelException ignored )
+//        {
+//            // This is ok, we were already successful in emptying the buffer, so the channel being closed here means
+//            // that some other thread is rotating the log and has closed the underlying channel. But since we were
+//            // successful in emptying the buffer *UNDER THE LOCK* we know that the rotating thread included the changes
+//            // we emptied into the channel, and thus it is already flushed by that thread.
+//        }
     }
 }
