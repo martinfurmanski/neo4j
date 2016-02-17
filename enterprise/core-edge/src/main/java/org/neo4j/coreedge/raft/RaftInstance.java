@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -257,13 +259,22 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
 
     private long lastApplied = -1;
 
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
+
     private void handleOutcome( Outcome<MEMBER> outcome ) throws RaftStorageException, IOException
     {
-        adjustLogShipping( outcome );
+        LeaderContext leaderContext = new LeaderContext( outcome.getTerm(), outcome.getLeaderCommit() );
+
+        adjustLogShipping( outcome, leaderContext );
         notifyLeaderChanges( outcome );
 
         raftState.update( outcome );
         membershipManager.processLog( outcome.getLogCommands() );
+
+        if ( myself.equals( outcome.getLeader() ) )
+        {
+            executor.submit( () -> logShipping.handleCommands( outcome.getShipCommands(), leaderContext ) );
+        }
 
         for ( long index = lastApplied + 1; index <= raftState.entryLog().commitIndex(); index++ )
         {
@@ -289,21 +300,19 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
         }
     }
 
-    private void adjustLogShipping( Outcome<MEMBER> outcome ) throws RaftStorageException
+    private void adjustLogShipping( Outcome<MEMBER> outcome, LeaderContext leaderContext ) throws RaftStorageException
     {
+
         MEMBER oldLeader = raftState.leader();
 
         if ( myself.equals( outcome.getLeader() ) )
         {
-            LeaderContext leaderContext = new LeaderContext( outcome.getTerm(), outcome.getLeaderCommit() );
 
             if ( !myself.equals( oldLeader ) )
             {
                 // We became leader, start the log shipping.
                 logShipping.start( leaderContext );
             }
-
-            logShipping.handleCommands( outcome.getShipCommands(), leaderContext );
         }
         else if ( myself.equals( oldLeader ) && !myself.equals( outcome.getLeader() ) )
         {
@@ -342,10 +351,13 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
             handleOutcome( outcome );
             currentRole = outcome.getNewRole();
 
-            for ( RaftMessages.Directed<MEMBER> outgoingMessage : outcome.getOutgoingMessages() )
-            {
-                outbound.send( outgoingMessage.to(), outgoingMessage.message() );
-            }
+            executor.submit( () -> {
+                for ( RaftMessages.Directed<MEMBER> outgoingMessage : outcome.getOutgoingMessages() )
+                {
+                    outbound.send( outgoingMessage.to(), outgoingMessage.message() );
+                }
+            } );
+
             if ( outcome.electionTimeoutRenewed() )
             {
                 electionTimer.renew();
