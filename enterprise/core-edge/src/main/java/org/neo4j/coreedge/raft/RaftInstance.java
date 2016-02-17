@@ -269,6 +269,17 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
         notifyLeaderChanges( outcome );
 
         raftState.update( outcome );
+
+        for ( LogCommand logCommand : outcome.getLogCommands() )
+        {
+            logCommand.applyTo( entryLog );
+        }
+
+        for ( RaftMessages.Directed<MEMBER> outgoingMessage : outcome.getOutgoingMessages() )
+        {
+            outbound.send( outgoingMessage.to(), outgoingMessage.message() );
+        }
+
         membershipManager.processLog( outcome.getLogCommands() );
 
         if ( myself.equals( outcome.getLeader() ) )
@@ -285,6 +296,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
                 stateMachine.flush();
             }
         }
+
         lastApplied = raftState.entryLog().commitIndex();
         volatileLeader.set( outcome.getLeader() );
     }
@@ -350,13 +362,6 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
 
             handleOutcome( outcome );
             currentRole = outcome.getNewRole();
-
-            executor.submit( () -> {
-                for ( RaftMessages.Directed<MEMBER> outgoingMessage : outcome.getOutgoingMessages() )
-                {
-                    outbound.send( outgoingMessage.to(), outgoingMessage.message() );
-                }
-            } );
 
             if ( outcome.electionTimeoutRenewed() )
             {

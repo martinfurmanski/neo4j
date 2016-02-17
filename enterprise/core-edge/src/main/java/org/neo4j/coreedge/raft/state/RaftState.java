@@ -148,10 +148,5 @@ public class RaftState<MEMBER> implements ReadableRaftState<MEMBER>
         votesForMe = outcome.getVotesForMe();
         lastLogIndexBeforeWeBecameLeader = outcome.getLastLogIndexBeforeWeBecameLeader();
         followerStates = outcome.getFollowerStates();
-
-        for ( LogCommand logCommand : outcome.getLogCommands() )
-        {
-            logCommand.applyTo( entryLog );
-        }
     }
 }
