@@ -39,7 +39,7 @@ public class LoggingOutbound<MEMBER> implements Outbound<MEMBER>
     @Override
     public void send( MEMBER to, Message... messages )
     {
-        messageLogger.log( me, to, messages );
+        //messageLogger.log( me, to, messages );
         outbound.send( to, messages );
     }
 }

@@ -45,7 +45,7 @@ public class LoggingInbound implements Inbound
         {
             public synchronized void handle( Message message )
             {
-                messageLogger.log( me, message );
+                //messageLogger.log( me, message );
                 handler.handle( message );
             }
         } );
