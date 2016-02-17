@@ -100,6 +100,8 @@ public class RaftServer<MEMBER> extends LifecycleAdapter implements Inbound
                 .group( workerGroup )
                 .channel( NioServerSocketChannel.class )
                 .option( ChannelOption.SO_REUSEADDR, true )
+                .option( ChannelOption.TCP_NODELAY, true )
+                .childOption( ChannelOption.TCP_NODELAY, true )
                 .localAddress( listenAddress.socketAddress() )
                 .childHandler( new ChannelInitializer<SocketChannel>()
                 {

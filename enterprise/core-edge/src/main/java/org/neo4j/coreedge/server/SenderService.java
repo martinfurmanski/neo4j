@@ -30,6 +30,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -145,7 +146,8 @@ public class SenderService extends LifecycleAdapter implements Outbound<Advertis
             bootstrap = new Bootstrap()
                     .group( eventLoopGroup )
                     .channel( NioSocketChannel.class )
-                    .handler( channelInitializer );
+                    .handler( channelInitializer )
+                    .option( ChannelOption.TCP_NODELAY, true );
 
             if ( scheduler != null )
             {
