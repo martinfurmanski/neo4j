@@ -340,7 +340,7 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
         buffer.flip();
 
         entriesChannel.writeAll( buffer, (appendIndex + 1) * ENTRY_RECORD_LENGTH );
-        entriesChannel.force( false );
+        //entriesChannel.force( false );
     }
 
     private Entry readEntry( long logIndex ) throws IOException
@@ -370,7 +370,7 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
         contentLengthBuffer.flip();
         contentChannel.writeAll( contentLengthBuffer, contentOffset );
         contentChannel.writeAll( contentBuffer, contentOffset + CONTENT_LENGTH_BYTES );
-        contentChannel.force( false );
+        //contentChannel.force( false );
 
         return length;
     }
@@ -395,7 +395,7 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
         buffer.putLong( commitIndex );
         buffer.flip();
         commitChannel.writeAll( buffer, 0 );
-        commitChannel.force( false );
+        //commitChannel.force( false );
     }
 
     private long readCommitIndex() throws IOException
