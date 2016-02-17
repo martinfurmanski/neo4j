@@ -370,7 +370,7 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
         contentLengthBuffer.flip();
         contentChannel.writeAll( contentLengthBuffer, contentOffset );
         contentChannel.writeAll( contentBuffer, contentOffset + CONTENT_LENGTH_BYTES );
-        //contentChannel.force( false );
+        contentChannel.force( false );
 
         return length;
     }
