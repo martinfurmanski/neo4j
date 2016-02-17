@@ -28,6 +28,7 @@ import io.netty.buffer.Unpooled;
 import org.neo4j.coreedge.raft.replication.MarshallingException;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.server.ByteBufMarshal;
+import org.neo4j.helpers.collection.LruCache;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.fs.StoreChannel;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
@@ -79,6 +80,8 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
     private long contentOffset;
     private long commitIndex = -1;
     private long term = -1;
+
+    LruCache<Long,RaftLogEntry> cache = new LruCache<>( "raftlog", 10  );
 
     public NaiveDurableRaftLog( FileSystemAbstraction fileSystem, File directory,
                                 ByteBufMarshal<ReplicatedContent> marshal, LogProvider logProvider )
@@ -163,6 +166,7 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
             writeEntry( new Entry( logEntry.term(), contentOffset ) );
             contentOffset += length;
             appendIndex++;
+            cache.put( appendIndex, logEntry );
             return appendIndex;
         }
         catch ( MarshallingException | IOException e )
@@ -174,6 +178,8 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
     @Override
     public void truncate( long fromIndex ) throws RaftStorageException
     {
+        cache.clear();
+
         try
         {
             if ( fromIndex <= commitIndex )
@@ -249,6 +255,12 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
     @Override
     public RaftLogEntry readLogEntry( long logIndex ) throws RaftStorageException
     {
+        RaftLogEntry logEntry = cache.get( logIndex );
+        if( logEntry != null )
+        {
+            return logEntry;
+        }
+
         try
         {
             Entry entry = readEntry( logIndex );
@@ -265,12 +277,24 @@ public class NaiveDurableRaftLog extends LifecycleAdapter implements RaftLog
     @Override
     public ReplicatedContent readEntryContent( long logIndex ) throws RaftStorageException
     {
+        RaftLogEntry logEntry = cache.get( logIndex );
+        if( logEntry != null )
+        {
+            return logEntry.content();
+        }
+
         return readLogEntry( logIndex ).content();
     }
 
     @Override
     public long readEntryTerm( long logIndex ) throws RaftStorageException
     {
+        RaftLogEntry logEntry = cache.get( logIndex );
+        if( logEntry != null )
+        {
+            return logEntry.term();
+        }
+
         try
         {
             return readEntry( logIndex ).term;
