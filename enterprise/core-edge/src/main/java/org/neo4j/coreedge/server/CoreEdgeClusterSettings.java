@@ -166,5 +166,5 @@ public class CoreEdgeClusterSettings
 
     @Description("The number of operations to be processed before the state machines flush to disk")
     public static final Setting<Integer> state_machine_flush_window_size =
-            setting( "core_edge.state_machine_flush_window_size", INTEGER, "100" );
+            setting( "core_edge.state_machine_flush_window_size", INTEGER, "100000" );
 }
