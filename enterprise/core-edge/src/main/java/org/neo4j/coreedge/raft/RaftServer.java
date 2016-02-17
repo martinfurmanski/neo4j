@@ -56,7 +56,7 @@ public class RaftServer<MEMBER> extends LifecycleAdapter implements Inbound
     private EventLoopGroup workerGroup;
     private Channel channel;
 
-    private final NamedThreadFactory threadFactory = new NamedThreadFactory( "raft-server" );
+    private final NamedThreadFactory threadFactory = new NamedThreadFactory( "raft-server", Thread.MAX_PRIORITY );
 
     public RaftServer( ByteBufMarshal<ReplicatedContent> marshal, ListenSocketAddress listenAddress, LogProvider logProvider )
     {

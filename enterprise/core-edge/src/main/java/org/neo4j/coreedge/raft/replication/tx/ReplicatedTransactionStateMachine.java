@@ -83,7 +83,7 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine
         public Thread newThread( Runnable r )
         {
             Thread thread = new Thread( r );
-            thread.setPriority( Thread.MIN_PRIORITY );
+            thread.setPriority( Thread.MAX_PRIORITY-2 );
             return thread;
         }
     } );

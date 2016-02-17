@@ -75,6 +75,7 @@ public class NonBlockingChannel implements Disposable
         };
 
         messageSendingThread = new Thread( this::messageSendingThreadWork );
+        messageSendingThread.setPriority( Thread.MAX_PRIORITY-1 );
         messageSendingThread.start();
     }
 
