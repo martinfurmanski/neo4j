@@ -92,7 +92,7 @@ public class RaftServer<MEMBER> extends LifecycleAdapter implements Inbound
 
     private void startNettyServer()
     {
-        workerGroup = new NioEventLoopGroup( 0, threadFactory );
+        workerGroup = new NioEventLoopGroup( 1, threadFactory );
 
         log.info( "Starting server at: " + listenAddress );
 

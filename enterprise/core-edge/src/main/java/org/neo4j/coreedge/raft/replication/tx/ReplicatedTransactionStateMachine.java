@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.replication.session.GlobalSession;
@@ -76,7 +77,16 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine
         this.log = logProvider.getLog( getClass() );
     }
 
-    private ExecutorService executor = Executors.newSingleThreadExecutor();
+    private ExecutorService executor = Executors.newSingleThreadExecutor( new ThreadFactory()
+    {
+        @Override
+        public Thread newThread( Runnable r )
+        {
+            Thread thread = new Thread( r );
+            thread.setPriority( Thread.MIN_PRIORITY );
+            return thread;
+        }
+    } );
 
     @Override
     public synchronized void applyCommand( ReplicatedContent content, long logIndex )
