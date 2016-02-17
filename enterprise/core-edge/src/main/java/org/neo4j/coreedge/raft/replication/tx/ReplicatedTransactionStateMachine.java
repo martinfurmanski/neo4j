@@ -21,6 +21,10 @@ package org.neo4j.coreedge.raft.replication.tx;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.replication.session.GlobalSession;
@@ -28,6 +32,7 @@ import org.neo4j.coreedge.raft.replication.session.GlobalSessionTrackerState;
 import org.neo4j.coreedge.raft.state.StateMachine;
 import org.neo4j.coreedge.raft.state.StateStorage;
 import org.neo4j.coreedge.server.core.locks.LockTokenManager;
+import org.neo4j.coreedge.server.core.locks.ReplicatedLockTokenRequest;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
@@ -71,12 +76,41 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine
         this.log = logProvider.getLog( getClass() );
     }
 
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
+
     @Override
     public synchronized void applyCommand( ReplicatedContent content, long logIndex )
     {
         if ( content instanceof ReplicatedTransaction )
         {
-            handleTransaction( (ReplicatedTransaction<MEMBER>) content, logIndex );
+            executor.submit( () ->
+                    handleTransaction( (ReplicatedTransaction<MEMBER>) content, logIndex ) );
+        }
+        else if ( content instanceof ReplicatedLockTokenRequest )
+        {
+            Future<?> flush = executor.submit( () -> {} );
+            boolean interrupted = false;
+
+            while( true )
+            {
+                try
+                {
+                    flush.get();
+                    if( interrupted )
+                    {
+                        Thread.interrupted();
+                    }
+                    return;
+                }
+                catch ( InterruptedException e )
+                {
+                    interrupted = true;
+                }
+                catch ( ExecutionException e )
+                {
+                    throw new RuntimeException( "Should not happen" );
+                }
+            }
         }
     }
 
