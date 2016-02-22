@@ -199,10 +199,13 @@ public class EnterpriseCoreEditionModule
         StateMachineApplier recoverableStateMachine;
         try
         {
-            int numberOfEntriesBeforeRotation = 1000; // TODO
-            DurableStateStorage<LastAppliedState> lastAppliedStorage = new DurableStateStorage<>( fileSystem, new File( clusterStateDirectory, "last-applied-state" ), "last-applied",
-                    new LastAppliedState.Marshal(), numberOfEntriesBeforeRotation, databaseHealthSupplier, logProvider );
-            recoverableStateMachine = new StateMachineApplier( stateMachines, monitoredRaftLog, lastAppliedStorage, config.get( CoreEdgeClusterSettings.state_machine_flush_window_size ), logProvider, databaseHealthSupplier );
+            DurableStateStorage<LastAppliedState> lastAppliedStorage = life.add( new DurableStateStorage<>(
+                    fileSystem, new File( clusterStateDirectory, "last-applied-state" ), "last-applied",
+                    new LastAppliedState.Marshal(), config.get( CoreEdgeClusterSettings.last_applied_state_size ),
+                    databaseHealthSupplier, logProvider ) );
+            recoverableStateMachine = new StateMachineApplier( stateMachines, monitoredRaftLog, lastAppliedStorage,
+                    config.get( CoreEdgeClusterSettings.state_machine_flush_window_size ),
+                    logProvider, databaseHealthSupplier );
         }
         catch ( IOException e )
         {
