@@ -32,24 +32,24 @@ import static org.mockito.Mockito.verify;
 
 public class RaftLogReplayTest
 {
-    @Test
-    public void shouldReplayLastCommittedEntry() throws Throwable
-    {
-        // given
-        StateMachine stateMachine = mock( StateMachine.class );
-        InMemoryRaftLog raftLog = new InMemoryRaftLog();
-        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 0 ) ) );
-        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 1 ) ) );
-        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 2 ) ) );
-        raftLog.commit( 2 );
-        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 3 ) ) );
-
-        RaftLogReplay replayer = new RaftLogReplay( stateMachine, raftLog, NullLogProvider.getInstance(), 1 );
-
-        // when
-        replayer.start();
-
-        // then
-        verify( stateMachine ).applyCommand( ReplicatedInteger.valueOf( 2 ), 2 );
-    }
+//    @Test
+//    public void shouldReplayLastCommittedEntry() throws Throwable
+//    {
+//        // given
+//        StateMachine stateMachine = mock( StateMachine.class );
+//        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+//        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 0 ) ) );
+//        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 1 ) ) );
+//        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 2 ) ) );
+//        raftLog.commit( 2 );
+//        raftLog.append( new RaftLogEntry( 0, ReplicatedInteger.valueOf( 3 ) ) );
+//
+//        RaftLogReplay replayer = new RaftLogReplay( stateMachine, raftLog, NullLogProvider.getInstance(), 1 );
+//
+//        // when
+//        replayer.start();
+//
+//        // then
+//        verify( stateMachine ).applyCommand( ReplicatedInteger.valueOf( 2 ), 2 );
+//    }
 }

@@ -21,37 +21,24 @@ package org.neo4j.coreedge.raft.state;
 
 import java.io.IOException;
 
-import org.neo4j.coreedge.raft.replication.ReplicatedContent;
-
-import static java.lang.Math.max;
-
-public class LastAppliedTrackingStateMachine implements StateMachine
+public class InMemoryStateStorage<STATE> implements StateStorage<STATE>
 {
-    public static final long NOTHING_APPLIED = -1;
+    private STATE state;
 
-    private final StateMachine stateMachine;
-    private long lastApplied = NOTHING_APPLIED;
-
-    public LastAppliedTrackingStateMachine( StateMachine stateMachine )
+    public InMemoryStateStorage( STATE state )
     {
-        this.stateMachine = stateMachine;
+        this.state = state;
     }
 
     @Override
-    public void applyCommand( ReplicatedContent content, long logIndex )
+    public STATE getInitialState()
     {
-        stateMachine.applyCommand( content, logIndex );
-        lastApplied = max( logIndex, lastApplied );
+        return state;
     }
 
     @Override
-    public void flush() throws IOException
+    public void persistStoreData( STATE state ) throws IOException
     {
-        stateMachine.flush();
-    }
-
-    public long lastApplied()
-    {
-        return lastApplied;
+        this.state = state;
     }
 }

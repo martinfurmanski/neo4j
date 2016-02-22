@@ -34,6 +34,7 @@ import org.neo4j.coreedge.catchup.StoreIdSupplier;
 import org.neo4j.coreedge.discovery.CoreDiscoveryService;
 import org.neo4j.coreedge.discovery.DiscoveryServiceFactory;
 import org.neo4j.coreedge.discovery.RaftDiscoveryServiceConnector;
+import org.neo4j.coreedge.raft.ConsensusListener;
 import org.neo4j.coreedge.raft.DelayedRenewableTimeoutService;
 import org.neo4j.coreedge.raft.LeaderLocator;
 import org.neo4j.coreedge.raft.RaftInstance;
@@ -69,7 +70,8 @@ import org.neo4j.coreedge.raft.replication.tx.ReplicatedTransactionCommitProcess
 import org.neo4j.coreedge.raft.replication.tx.ReplicatedTransactionStateMachine;
 import org.neo4j.coreedge.raft.roles.Role;
 import org.neo4j.coreedge.raft.state.DurableStateStorage;
-import org.neo4j.coreedge.raft.state.LastAppliedTrackingStateMachine;
+import org.neo4j.coreedge.raft.state.LastAppliedState;
+import org.neo4j.coreedge.raft.state.StateMachineApplier;
 import org.neo4j.coreedge.raft.state.StateMachines;
 import org.neo4j.coreedge.raft.state.StateStorage;
 import org.neo4j.coreedge.raft.state.id_allocation.IdAllocationState;
@@ -85,9 +87,9 @@ import org.neo4j.coreedge.server.Expiration;
 import org.neo4j.coreedge.server.ExpiryScheduler;
 import org.neo4j.coreedge.server.ListenSocketAddress;
 import org.neo4j.coreedge.server.SenderService;
-import org.neo4j.coreedge.server.core.locks.ReplicatedLockTokenState;
 import org.neo4j.coreedge.server.core.locks.LeaderOnlyLockManager;
 import org.neo4j.coreedge.server.core.locks.LockTokenManager;
+import org.neo4j.coreedge.server.core.locks.ReplicatedLockTokenState;
 import org.neo4j.coreedge.server.core.locks.ReplicatedLockTokenStateMachine;
 import org.neo4j.coreedge.server.logging.BetterMessageLogger;
 import org.neo4j.coreedge.server.logging.MessageLogger;
@@ -194,13 +196,22 @@ public class EnterpriseCoreEditionModule
                 marshal, logProvider ) ), platformModule.monitors );
 
         StateMachines stateMachines = new StateMachines();
-        LastAppliedTrackingStateMachine lastAppliedStateMachine = new LastAppliedTrackingStateMachine( stateMachines );
-
-        int flushAfter = config.get( CoreEdgeClusterSettings.state_machine_flush_window_size );
+        StateMachineApplier recoverableStateMachine;
+        try
+        {
+            int numberOfEntriesBeforeRotation = 1000; // TODO
+            DurableStateStorage<LastAppliedState> lastAppliedStorage = new DurableStateStorage<>( fileSystem, new File( clusterStateDirectory, "last-applied-state" ), "last-applied",
+                    new LastAppliedState.Marshal(), numberOfEntriesBeforeRotation, databaseHealthSupplier, logProvider );
+            recoverableStateMachine = new StateMachineApplier( stateMachines, monitoredRaftLog, lastAppliedStorage, config.get( CoreEdgeClusterSettings.state_machine_flush_window_size ), logProvider, databaseHealthSupplier );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
 
         raft = createRaft( life, loggingOutbound, discoveryService, config, messageLogger, monitoredRaftLog,
-                lastAppliedStateMachine, fileSystem, clusterStateDirectory, myself, logProvider, raftServer,
-                raftTimeoutService, databaseHealthSupplier, platformModule.monitors, flushAfter );
+                recoverableStateMachine, fileSystem, clusterStateDirectory, myself, logProvider, raftServer,
+                raftTimeoutService, databaseHealthSupplier, platformModule.monitors );
 
         dependencies.satisfyDependency( raft );
 
@@ -338,7 +349,7 @@ public class EnterpriseCoreEditionModule
 
         life.add( CoreServerStartupProcess.createLifeSupport(
                 platformModule.dataSourceManager, replicatedIdGeneratorFactory, raft,
-                new RaftLogReplay( lastAppliedStateMachine, monitoredRaftLog, logProvider, flushAfter ), raftServer,
+                recoverableStateMachine, raftServer,
                 catchupServer, raftTimeoutService, membershipWaiter,
                 joinCatchupTimeout,
                 new RecoverTransactionLogState( dependencies, logProvider,
@@ -397,20 +408,20 @@ public class EnterpriseCoreEditionModule
     }
 
     private static RaftInstance<CoreMember> createRaft( LifeSupport life,
-                                                        Outbound<AdvertisedSocketAddress> outbound,
-                                                        CoreDiscoveryService discoveryService,
-                                                        Config config,
-                                                        MessageLogger<AdvertisedSocketAddress> messageLogger,
-                                                        RaftLog raftLog,
-                                                        LastAppliedTrackingStateMachine stateMachines,
-                                                        FileSystemAbstraction fileSystem,
-                                                        File clusterStateDirectory,
-                                                        CoreMember myself,
-                                                        LogProvider logProvider,
-                                                        RaftServer<CoreMember> raftServer,
-                                                        DelayedRenewableTimeoutService raftTimeoutService,
-                                                        Supplier<DatabaseHealth> databaseHealthSupplier,
-                                                        Monitors monitors, int flushAfter )
+            Outbound<AdvertisedSocketAddress> outbound,
+            CoreDiscoveryService discoveryService,
+            Config config,
+            MessageLogger<AdvertisedSocketAddress> messageLogger,
+            RaftLog raftLog,
+            ConsensusListener consensusListener,
+            FileSystemAbstraction fileSystem,
+            File clusterStateDirectory,
+            CoreMember myself,
+            LogProvider logProvider,
+            RaftServer<CoreMember> raftServer,
+            DelayedRenewableTimeoutService raftTimeoutService,
+            Supplier<DatabaseHealth> databaseHealthSupplier,
+            Monitors monitors )
     {
         StateStorage<TermState> termState;
         try
@@ -480,10 +491,10 @@ public class EnterpriseCoreEditionModule
                 config.get( CoreEdgeClusterSettings.log_shipping_max_lag ) );
 
         RaftInstance<CoreMember> raftInstance = new RaftInstance<>(
-                myself, termState, voteState, raftLog, stateMachines, electionTimeout, heartbeatInterval,
+                myself, termState, voteState, raftLog, consensusListener, electionTimeout, heartbeatInterval,
                 raftTimeoutService, loggingRaftInbound,
                 new RaftOutbound( outbound ), leaderWaitTimeout, logProvider,
-                raftMembershipManager, logShipping, databaseHealthSupplier, monitors, flushAfter );
+                raftMembershipManager, logShipping, databaseHealthSupplier, monitors );
 
         life.add( new RaftDiscoveryServiceConnector( discoveryService, raftInstance ) );
 
@@ -514,8 +525,7 @@ public class EnterpriseCoreEditionModule
 
     protected SchemaWriteGuard createSchemaWriteGuard()
     {
-        return () -> {
-        };
+        return () -> {};
     }
 
     protected KernelData createKernelData( FileSystemAbstraction fileSystem, PageCache pageCache, File storeDir,
