@@ -124,7 +124,7 @@ public class StateMachineApplier extends LifecycleAdapter implements ConsensusLi
     }
 
     @Override
-    public synchronized void start() throws Throwable
+    public synchronized void start() throws IOException, RaftStorageException
     {
         lastApplied = lastAppliedStorage.getInitialState().get();
         log.info( "Replaying commands from index %d to index %d", lastApplied, raftLog.commitIndex() );
@@ -145,7 +145,7 @@ public class StateMachineApplier extends LifecycleAdapter implements ConsensusLi
     }
 
     @Override
-    public void stop() throws Throwable
+    public void stop() throws InterruptedException
     {
         stopApplier();
         applierThread.join();
