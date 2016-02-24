@@ -24,9 +24,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import org.neo4j.cluster.ExecutorLifecycleAdapter;
 import org.neo4j.coreedge.catchup.CatchupServer;
 import org.neo4j.coreedge.catchup.CheckpointerSupplier;
 import org.neo4j.coreedge.catchup.DataSourceSupplier;
@@ -203,9 +206,12 @@ public class EnterpriseCoreEditionModule
                     fileSystem, new File( clusterStateDirectory, "last-applied-state" ), "last-applied",
                     new LastAppliedState.Marshal(), config.get( CoreEdgeClusterSettings.last_applied_state_size ),
                     databaseHealthSupplier, logProvider ) );
-            recoverableStateMachine = new StateMachineApplier( stateMachines, monitoredRaftLog, lastAppliedStorage,
+            ExecutorService applyExecutor = Executors.newSingleThreadExecutor();
+            life.add( new ExecutorServiceLifecycleAdapter( applyExecutor ) );
+            recoverableStateMachine = new StateMachineApplier(
+                    stateMachines, monitoredRaftLog, lastAppliedStorage, applyExecutor,
                     config.get( CoreEdgeClusterSettings.state_machine_flush_window_size ),
-                    logProvider, databaseHealthSupplier );
+                    databaseHealthSupplier, logProvider );
         }
         catch ( IOException e )
         {

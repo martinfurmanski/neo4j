@@ -19,41 +19,44 @@
  */
 package org.neo4j.coreedge.server.core;
 
+import java.io.IOException;
 import java.util.function.Supplier;
 
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.mockito.internal.verification.VerificationModeFactory;
-import org.mockito.verification.Timeout;
-import org.mockito.verification.VerificationWithTimeout;
 
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogEntry;
+import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.state.InMemoryStateStorage;
 import org.neo4j.coreedge.raft.state.LastAppliedState;
 import org.neo4j.coreedge.raft.state.StateMachine;
 import org.neo4j.coreedge.raft.state.StateMachineApplier;
 import org.neo4j.kernel.internal.DatabaseHealth;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import static org.neo4j.coreedge.raft.ReplicatedInteger.valueOf;
 import static org.neo4j.logging.NullLogProvider.getInstance;
 
 public class StateMachineApplierTest
 {
-    private InMemoryRaftLog raftLog = new InMemoryRaftLog();
-    private StateMachineApplier applier;
-    private StateMachine stateMachine;
-    private InMemoryStateStorage<LastAppliedState> lastApplied;
-
     @Test
     public void shouldApplyCommittedCommands() throws Exception
     {
         // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+        StateMachine stateMachine = mock( StateMachine.class );
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 10, health(), getInstance() );
+
         raftLog.append( new RaftLogEntry( 0, valueOf( 0 ) ) );
         raftLog.commit( 0 );
         applier.start();
@@ -62,26 +65,39 @@ public class StateMachineApplierTest
         applier.notifyCommitted();
 
         // then
-        verify( stateMachine, soon() ).applyCommand( valueOf( 0 ), 0 );
+        verify( stateMachine ).applyCommand( valueOf( 0 ), 0 );
     }
 
     @Test
     public void shouldNotApplyAnythingIfNothingIsCommitted() throws Exception
     {
         // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+        StateMachine stateMachine = mock( StateMachine.class );
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 10, health(), getInstance() );
+
+        raftLog.append( new RaftLogEntry( 0, valueOf( 0 ) ) );
         applier.start();
 
         // when
         applier.notifyCommitted();
 
         // then
-        verify( stateMachine, never() ).applyCommand( valueOf( 0 ), 0 );
+        verify( stateMachine, times( 0 ) ).applyCommand( valueOf( 0 ), 0 );
     }
 
     @Test
-    public void startShouldApplyCommittedButUnAppliedCommands() throws Exception
+    public void startShouldApplyCommittedButNotYetAppliedCommands() throws Exception
     {
         // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+        StateMachine stateMachine = mock( StateMachine.class );
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 10, health(), getInstance() );
+
         raftLog.append( new RaftLogEntry( 0, valueOf( 0 ) ) );
         raftLog.append( new RaftLogEntry( 0, valueOf( 1 ) ) );
         raftLog.append( new RaftLogEntry( 0, valueOf( 2 ) ) );
@@ -96,35 +112,134 @@ public class StateMachineApplierTest
         // then
         verify( stateMachine ).applyCommand( valueOf( 2 ), 2 );
         verify( stateMachine ).applyCommand( valueOf( 3 ), 3 );
+        verifyNoMoreInteractions( stateMachine );
     }
 
-    private static VerificationWithTimeout soon()
+    @Test
+    public void shouldPeriodicallyFlushStateMachines() throws Exception
     {
-        return timeout( 10 );
+        // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+        StateMachine stateMachine = mock( StateMachine.class );
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 5, health(), getInstance() );
+
+        for ( int i = 0; i < 50; i++ )
+        {
+            raftLog.append( new RaftLogEntry( 0, valueOf( i ) ) );
+        }
+        raftLog.commit( 49 );
+
+        // when
+        applier.start();
+
+        // then
+        verify( stateMachine, times( 10 ) ).flush();
     }
 
-    private static Timeout never()
+    @Test
+    public void shouldPeriodicallyStoreLastAppliedState() throws Exception
     {
-        return new Timeout( 10, VerificationModeFactory.noMoreInteractions() );
+        // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+        StateMachine stateMachine = mock( StateMachine.class );
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 5, health(), getInstance() );
+
+        for ( int i = 0; i < 50; i++ )
+        {
+            raftLog.append( new RaftLogEntry( 0, valueOf( i ) ) );
+        }
+        raftLog.commit( 49 );
+
+        // when
+        applier.start();
+
+        // then
+        assertEquals( 45L, lastApplied.getInitialState().get() );
     }
 
-    @Before
-    public void setup() throws Exception
+    @Test
+    public void shouldPanicIfUnableToApply() throws Exception
     {
-        stateMachine = mock( StateMachine.class );
-        lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
-        applier = new StateMachineApplier( stateMachine, raftLog, lastApplied, 1, getInstance(), health() );
+        // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+
+        StateMachine stateMachine = new FailingStateMachine();
+
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+
+        Supplier<DatabaseHealth> healthSupplier = health();
+        DatabaseHealth health = mock( DatabaseHealth.class );
+        when( healthSupplier.get() ).thenReturn( health );
+
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 5, healthSupplier, getInstance() );
+
+
+        raftLog.append( new RaftLogEntry( 0, valueOf( 1 ) ) );
+        raftLog.commit( 0 );
+
+        // when
+        applier.notifyCommitted();
+
+        // then
+        verify( health ).panic( anyObject() );
     }
 
-    @After
-    public void tearDown() throws Exception
+    @Test
+    public void shouldNotStartIfUnableToApplyOnStartUp() throws Exception
     {
-        applier.stop();
+        // given
+        InMemoryRaftLog raftLog = new InMemoryRaftLog();
+
+        StateMachine stateMachine = new FailingStateMachine();
+
+        InMemoryStateStorage<LastAppliedState> lastApplied = new InMemoryStateStorage<>( new LastAppliedState( -1 ) );
+
+        Supplier<DatabaseHealth> healthSupplier = health();
+        DatabaseHealth health = mock( DatabaseHealth.class );
+        when( healthSupplier.get() ).thenReturn( health );
+
+        StateMachineApplier applier = new StateMachineApplier( stateMachine, raftLog, lastApplied,
+                Runnable::run, 5, healthSupplier, getInstance() );
+
+
+        raftLog.append( new RaftLogEntry( 0, valueOf( 1 ) ) );
+        raftLog.commit( 0 );
+
+        // when
+        try
+        {
+            applier.start();
+            fail( "Should have thrown IllegalStateException" );
+        }
+        catch ( IllegalStateException ignored )
+        {
+            // expected
+        }
     }
 
     @SuppressWarnings("unchecked")
     private Supplier<DatabaseHealth> health()
     {
         return mock( Supplier.class );
+    }
+
+    private static class FailingStateMachine implements StateMachine
+    {
+        @Override
+        public void applyCommand( ReplicatedContent content, long logIndex )
+        {
+            throw new IllegalStateException();
+        }
+
+        @Override
+        public void flush() throws IOException
+        {
+            // do nothing
+        }
     }
 }

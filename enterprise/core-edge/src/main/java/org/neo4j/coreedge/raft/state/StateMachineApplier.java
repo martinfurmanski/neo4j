@@ -20,6 +20,8 @@
 package org.neo4j.coreedge.raft.state;
 
 import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 import org.neo4j.coreedge.raft.ConsensusListener;
@@ -45,13 +47,18 @@ public class StateMachineApplier extends LifecycleAdapter implements ConsensusLi
     private final Log log;
     private long lastApplied = NOTHING_APPLIED;
 
-    private Thread applierThread;
-    private boolean applierShouldBeRunning;
+    private Executor executor;
 
     private long commitIndex = NOTHING_APPLIED;
 
-    public StateMachineApplier( StateMachine stateMachine, ReadableRaftLog raftLog, StateStorage<LastAppliedState> lastAppliedStorage,
-            int flushEvery, LogProvider logProvider, Supplier<DatabaseHealth> dbHealth )
+    public StateMachineApplier(
+            StateMachine stateMachine,
+            ReadableRaftLog raftLog,
+            StateStorage<LastAppliedState> lastAppliedStorage,
+            Executor executor,
+            int flushEvery,
+            Supplier<DatabaseHealth> dbHealth,
+            LogProvider logProvider )
     {
         this.stateMachine = stateMachine;
         this.raftLog = raftLog;
@@ -59,53 +66,34 @@ public class StateMachineApplier extends LifecycleAdapter implements ConsensusLi
         this.flushEvery = flushEvery;
         this.log = logProvider.getLog( getClass() );
         this.dbHealth = dbHealth;
-
-        applierThread = new Thread( this::applyThreadRunner, "state-machine-applier" );
+        this.executor = executor;
     }
 
     @Override
     public synchronized void notifyCommitted()
     {
-        if( this.commitIndex != raftLog.commitIndex() )
+        long commitIndex = raftLog.commitIndex();
+        if ( this.commitIndex != commitIndex )
         {
-            this.commitIndex = raftLog.commitIndex();
-            notifyAll();
-        }
-    }
+            this.commitIndex = commitIndex;
+            executor.execute( () -> {
 
-    private synchronized long waitForCommit() throws InterruptedException
-    {
-        while( lastApplied == commitIndex && applierShouldBeRunning )
-        {
-            wait();
-        }
-        return commitIndex;
-    }
-
-    private void applyThreadRunner()
-    {
-        while( applierShouldBeRunning )
-        {
-            try
-            {
-                long commitIndex = waitForCommit();
-                applyUpTo( commitIndex );
-            }
-            catch ( InterruptedException e )
-            {
-                log.warn( "Applier unexpectedly interrupted", e );
-            }
-            catch ( RaftStorageException | IOException e )
-            {
-                log.error( "Applier had storage exception", e );
-                dbHealth.get().panic( e );
-                applierShouldBeRunning = false;
-            }
+                try
+                {
+                    applyUpTo( commitIndex );
+                }
+                catch ( Exception e )
+                {
+                    log.error( "Failed to apply up to index " + commitIndex, e );
+                    dbHealth.get().panic( e );
+                }
+            } );
         }
     }
 
     private void applyUpTo( long commitIndex ) throws IOException, RaftStorageException
     {
+
         while ( lastApplied < commitIndex )
         {
             long indexToApply = lastApplied + 1;
@@ -132,22 +120,5 @@ public class StateMachineApplier extends LifecycleAdapter implements ConsensusLi
         long start = currentTimeMillis();
         applyUpTo( raftLog.commitIndex() );
         log.info( "Replay done, took %d ms", currentTimeMillis() - start );
-
-        applierThread = new Thread( this::applyThreadRunner, "state-machine-applier" );
-        applierShouldBeRunning = true;
-        applierThread.start();
-    }
-
-    private synchronized void stopApplier()
-    {
-        applierShouldBeRunning = false;
-        notifyAll();
-    }
-
-    @Override
-    public void stop() throws InterruptedException
-    {
-        stopApplier();
-        applierThread.join();
     }
 }
