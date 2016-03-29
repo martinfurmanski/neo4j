@@ -19,11 +19,13 @@
  */
 package org.neo4j.coreedge.raft.replication.tx;
 
-import org.neo4j.coreedge.raft.replication.session.LocalOperationId;
+import java.util.Optional;
 
-public interface CommittingTransactions
+import org.neo4j.coreedge.raft.replication.ReplicatedContent;
+import org.neo4j.coreedge.raft.state.CoreStateMachines;
+import org.neo4j.coreedge.raft.state.Result;
+
+public interface CoreReplicatedContent extends ReplicatedContent
 {
-    CommittingTransaction register( LocalOperationId localOperationId );
-
-    CommittingTransaction retrieve( LocalOperationId localOperationId );
+    Optional<Result> dispatch( CoreStateMachines coreStateMachines, long commandIndex );
 }

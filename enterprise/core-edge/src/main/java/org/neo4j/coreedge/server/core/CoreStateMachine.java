@@ -32,7 +32,7 @@ import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogCompactedException;
 import org.neo4j.coreedge.raft.replication.tx.ConstantTimeRetryStrategy;
 import org.neo4j.coreedge.raft.replication.tx.RetryStrategy;
-import org.neo4j.coreedge.raft.state.StateMachineApplier;
+import org.neo4j.coreedge.raft.state.CoreState;
 import org.neo4j.coreedge.server.AdvertisedSocketAddress;
 import org.neo4j.coreedge.server.edge.CoreServerSelectionStrategy;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
@@ -41,7 +41,7 @@ import org.neo4j.logging.LogProvider;
 
 public class CoreStateMachine extends LifecycleAdapter implements RaftStateMachine
 {
-    private final StateMachineApplier stateMachineApplier;
+    private final CoreState coreState;
     private final LocalDatabase localDatabase;
     private final CoreServerSelectionStrategy selectionStrategy;
     private final StoreFetcher storeFetcher;
@@ -50,7 +50,7 @@ public class CoreStateMachine extends LifecycleAdapter implements RaftStateMachi
     private final Log log;
 
     public CoreStateMachine(
-            StateMachineApplier stateMachineApplier,
+            CoreState coreState,
             LocalDatabase localDatabase,
             CoreServerSelectionStrategy selectionStrategy,
             StoreFetcher storeFetcher,
@@ -58,7 +58,7 @@ public class CoreStateMachine extends LifecycleAdapter implements RaftStateMachi
             LogProvider logProvider,
             RaftLog raftLog )
     {
-        this.stateMachineApplier = stateMachineApplier;
+        this.coreState = coreState;
         this.localDatabase = localDatabase;
         this.selectionStrategy = selectionStrategy;
         this.storeFetcher = storeFetcher;
@@ -80,14 +80,14 @@ public class CoreStateMachine extends LifecycleAdapter implements RaftStateMachi
     @Override
     public void notifyCommitted( long commitIndex )
     {
-        stateMachineApplier.notifyUpdate();
+        coreState.notifyUpdate();
     }
 
     public void compact()
     {
         try
         {
-            raftLog.prune( stateMachineApplier.lastFlushed() );
+            raftLog.prune( coreState.lastFlushed() );
         }
         catch ( IOException e )
         {
@@ -154,6 +154,6 @@ public class CoreStateMachine extends LifecycleAdapter implements RaftStateMachi
         log.info( "Server starting, connecting to core server at %s", source.toString() );
 
         localDatabase.copyStoreFrom( source, storeFetcher );
-        stateFetcher.copyRaftState( source, stateMachineApplier.get() );
+        stateFetcher.copyRaftState( source, coreState );
     }
 }

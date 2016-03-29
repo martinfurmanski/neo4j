@@ -25,46 +25,46 @@ import org.neo4j.storageengine.api.ReadPastEndException;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
-public class LastAppliedState
+public class LastFlushedState
 {
-    private final long lastApplied;
+    private final long lastFlushed;
 
-    public LastAppliedState( long lastApplied )
+    public LastFlushedState( long lastFlushed )
     {
-        this.lastApplied = lastApplied;
+        this.lastFlushed = lastFlushed;
     }
 
     public long get()
     {
-        return lastApplied;
+        return lastFlushed;
     }
 
-    public static class Marshal implements StateMarshal<LastAppliedState>
+    public static class Marshal implements StateMarshal<LastFlushedState>
     {
         @Override
-        public LastAppliedState startState()
+        public LastFlushedState startState()
         {
-            return new LastAppliedState( -1 );
+            return new LastFlushedState( -1 );
         }
 
         @Override
-        public long ordinal( LastAppliedState lastAppliedState )
+        public long ordinal( LastFlushedState lastFlushedState )
         {
-            return lastAppliedState.get();
+            return lastFlushedState.get();
         }
 
         @Override
-        public void marshal( LastAppliedState lastAppliedState, WritableChannel channel ) throws IOException
+        public void marshal( LastFlushedState lastFlushedState, WritableChannel channel ) throws IOException
         {
-            channel.putLong( lastAppliedState.get() );
+            channel.putLong( lastFlushedState.get() );
         }
 
         @Override
-        public LastAppliedState unmarshal( ReadableChannel source ) throws IOException
+        public LastFlushedState unmarshal( ReadableChannel source ) throws IOException
         {
             try
             {
-                return new LastAppliedState( source.getLong() );
+                return new LastFlushedState( source.getLong() );
             }
             catch( ReadPastEndException e )
             {

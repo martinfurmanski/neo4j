@@ -19,37 +19,86 @@
  */
 package org.neo4j.coreedge.raft.replication;
 
+import java.util.concurrent.Future;
+import java.util.function.BiConsumer;
+
 import org.neo4j.coreedge.raft.LeaderLocator;
-import org.neo4j.coreedge.raft.NoLeaderFoundException;
 import org.neo4j.coreedge.raft.RaftMessages;
 import org.neo4j.coreedge.raft.net.Outbound;
+import org.neo4j.coreedge.raft.replication.session.LocalSessionPool;
+import org.neo4j.coreedge.raft.replication.session.OperationContext;
+import org.neo4j.coreedge.raft.replication.tx.RetryStrategy;
+import org.neo4j.coreedge.raft.state.ProgressTracker;
+import org.neo4j.kernel.impl.util.Listener;
 
-public class RaftReplicator<MEMBER> implements Replicator
+/**
+ * A replicator implementation suitable in a RAFT context. Will handle resending due to timeouts and leader switches.
+ */
+public class RaftReplicator<MEMBER> implements Replicator, Listener<MEMBER>
 {
-    private final LeaderLocator<MEMBER> leaderLocator;
     private final MEMBER me;
     private final Outbound<MEMBER> outbound;
+    private final ProgressTracker progressTracker;
+    private final LocalSessionPool sessionPool;
+    private final RetryStrategy retryStrategy;
 
-    public RaftReplicator( LeaderLocator<MEMBER> leaderLocator, MEMBER me, Outbound<MEMBER> outbound )
+    private MEMBER leader;
+
+    public RaftReplicator( LeaderLocator<MEMBER> leaderLocator, MEMBER me, Outbound<MEMBER> outbound, LocalSessionPool<MEMBER> sessionPool, ProgressTracker progressTracker, RetryStrategy retryStrategy )
     {
-        this.leaderLocator = leaderLocator;
         this.me = me;
         this.outbound = outbound;
+        this.progressTracker = progressTracker;
+        this.sessionPool = sessionPool;
+        this.retryStrategy = retryStrategy;
+
+        leaderLocator.registerListener( this );
     }
 
     @Override
-    public synchronized void replicate( ReplicatedContent content ) throws ReplicationFailedException
+    public Future<Object> replicate( ReplicatedContent command, boolean trackResult ) throws InterruptedException
     {
-        MEMBER leader;
-        try
+        OperationContext session = sessionPool.acquireSession();
+
+        DistributedOperation operation = new DistributedOperation( command, session.globalSession(), session.localOperationId() );
+        Progress progress = progressTracker.start( operation );
+
+        RetryStrategy.Timeout timeout = retryStrategy.newTimeout();
+        do
         {
-            leader = leaderLocator.getLeader();
+            outbound.send( leader, new RaftMessages.NewEntry.Request<>( me, operation ) );
+            try
+            {
+                progress.awaitReplication( timeout.getMillis() );
+                timeout.increment();
+            }
+            catch ( InterruptedException e )
+            {
+                progressTracker.end( operation );
+                throw e;
+            }
+        } while( !progress.isReplicated() );
+
+        BiConsumer<Object,Throwable> cleanup = ( ignored1, ignored2 ) -> {
+            sessionPool.releaseSession( session );
+        };
+
+        if( trackResult )
+        {
+            progress.futureResult().whenComplete( cleanup );
         }
-        catch ( NoLeaderFoundException e )
+        else
         {
-            throw new ReplicationFailedException( e );
+            sessionPool.releaseSession( session );
         }
 
-        outbound.send( leader, new RaftMessages.NewEntry.Request<>( me, content ) );
+        return progress.futureResult();
+    }
+
+    @Override
+    public void receive( MEMBER leader )
+    {
+        this.leader = leader;
+        progressTracker.retriggerReplication();
     }
 }

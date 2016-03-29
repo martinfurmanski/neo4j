@@ -180,7 +180,6 @@ public class Leader implements RaftMessageHandler
                     }
                     else
                     {
-                    System.out.println("WOULD LIKE TO BE IN HERE");
                         // There are no earlier entries, message the follower that we have compacted so that
                         // it can take appropriate action.
                         outcome.addOutgoingMessage( new RaftMessages.Directed<>( response.from(),
@@ -210,7 +209,6 @@ public class Leader implements RaftMessageHandler
             {
                 RaftMessages.NewEntry.Request<MEMBER> req = (RaftMessages.NewEntry.Request<MEMBER>) message;
                 ReplicatedContent content = req.content();
-
                 Appending.appendNewEntry( ctx, outcome, content );
                 break;
             }
