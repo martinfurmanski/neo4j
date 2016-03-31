@@ -425,7 +425,7 @@ public class EnterpriseCoreEditionModule
 
             ReplicatedTransactionStateMachine<CoreMember> replicatedTxStateMachine =
                     new ReplicatedTransactionStateMachine<>( localCommit, replicatedLockTokenStateMachine,
-                            logging.getInternalLogProvider(), txLogState );
+                            logging.getInternalLogProvider(), txLogState, myself );
             dependencies.satisfyDependencies( replicatedTxStateMachine );
 
             ReplicatedTokenStateMachine<Token>
@@ -463,7 +463,7 @@ public class EnterpriseCoreEditionModule
                 throw new RuntimeException( e );
             }
 
-            return new ReplicatedTransactionCommitProcess( replicator );
+            return new ReplicatedTransactionCommitProcess( replicator, myself );
         };
 
         this.relationshipTypeTokenHolder = relationshipTypeTokenHolder;

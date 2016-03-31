@@ -49,7 +49,7 @@ public class ReplicatedTransactionCommitProcessTest
         futureTxId.complete( 5L );
 
         when( replicator.replicate( any( ReplicatedContent.class ), anyBoolean() ) ).thenReturn( futureTxId );
-        ReplicatedTransactionCommitProcess commitProcess = new ReplicatedTransactionCommitProcess( replicator );
+        ReplicatedTransactionCommitProcess commitProcess = new ReplicatedTransactionCommitProcess( replicator, null );
 
         // when
         long txId = commitProcess.commit( tx(), CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );

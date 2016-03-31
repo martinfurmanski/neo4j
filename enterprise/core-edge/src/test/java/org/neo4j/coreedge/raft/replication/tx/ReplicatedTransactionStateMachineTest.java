@@ -65,7 +65,7 @@ public class ReplicatedTransactionStateMachineTest
 
         ReplicatedTransactionStateMachine stateMachine = new ReplicatedTransactionStateMachine<>(
                 localCommitProcess, lockState( lockSessionId ), NullLogProvider.getInstance(),
-                recoverTransactionLogState);
+                recoverTransactionLogState, null );
 
         // when
         stateMachine.applyCommand( tx, 0 );
@@ -92,7 +92,7 @@ public class ReplicatedTransactionStateMachineTest
 
         final ReplicatedTransactionStateMachine<RaftTestMember> stateMachine = new ReplicatedTransactionStateMachine<>(
                 localCommitProcess, lockState( currentLockSessionId ), NullLogProvider.getInstance(),
-                recoverTransactionLogState);
+                recoverTransactionLogState, null );
 
         // when
         Optional<Result> result = stateMachine.applyCommand( tx, 0 );
@@ -126,7 +126,7 @@ public class ReplicatedTransactionStateMachineTest
 
         ReplicatedTransactionStateMachine<RaftStateMachine> stateMachine = new ReplicatedTransactionStateMachine<>(
                 localCommitProcess, lockState( currentLockSessionId ), NullLogProvider.getInstance(),
-                recoverTransactionLogState);
+                recoverTransactionLogState, null );
 
         // when
         Optional<Result> result = stateMachine.applyCommand( tx, 0 );

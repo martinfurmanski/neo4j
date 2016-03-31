@@ -22,6 +22,7 @@ package org.neo4j.coreedge.raft.replication.id;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.neo4j.coreedge.helper.StatUtil;
 import org.neo4j.coreedge.raft.replication.Replicator;
 import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.kernel.ha.id.IdAllocation;
@@ -46,10 +47,13 @@ public class ReplicatedIdRangeAcquirer
     private final CoreMember me;
     private final Log log;
 
+    StatUtil.StatContext stat;
+
     public ReplicatedIdRangeAcquirer(
             Replicator replicator, ReplicatedIdAllocationStateMachine idAllocationStateMachine,
             int allocationChunk, CoreMember me, LogProvider logProvider )
     {
+        stat = StatUtil.create( "id-acquirer" + me, 30000, true );
         this.replicator = replicator;
         this.idAllocationStateMachine = idAllocationStateMachine;
         this.allocationChunk = allocationChunk;
@@ -59,6 +63,7 @@ public class ReplicatedIdRangeAcquirer
 
     public IdAllocation acquireIds( IdType idType ) throws InterruptedException
     {
+        StatUtil.TimingContext timing = stat.time();
         while ( true )
         {
             long firstUnallocated = idAllocationStateMachine.firstUnallocated( idType );
@@ -72,6 +77,7 @@ public class ReplicatedIdRangeAcquirer
                 boolean success = (boolean) futureResult.get();
                 if( success )
                 {
+                    timing.end();
                     IdRange idRange = new IdRange( EMPTY_LONG_ARRAY, firstUnallocated, allocationChunk );
                     return new IdAllocation( idRange, -1, 0 );
                 }

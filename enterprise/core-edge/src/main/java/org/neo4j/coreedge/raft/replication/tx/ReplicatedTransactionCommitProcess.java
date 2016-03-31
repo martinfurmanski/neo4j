@@ -22,7 +22,9 @@ package org.neo4j.coreedge.raft.replication.tx;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.neo4j.coreedge.helper.StatUtil;
 import org.neo4j.coreedge.raft.replication.Replicator;
+import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
@@ -34,10 +36,12 @@ import static org.neo4j.coreedge.raft.replication.tx.ReplicatedTransactionFactor
 public class ReplicatedTransactionCommitProcess implements TransactionCommitProcess
 {
     private final Replicator replicator;
+    private final StatUtil.StatContext stat;
 
-    public ReplicatedTransactionCommitProcess( Replicator replicator )
+    public ReplicatedTransactionCommitProcess( Replicator replicator, CoreMember myself )
     {
         this.replicator = replicator;
+        stat = StatUtil.create( "tx-commit-process-" + myself, 30000, true );
     }
 
     @Override
@@ -45,6 +49,8 @@ public class ReplicatedTransactionCommitProcess implements TransactionCommitProc
                         final CommitEvent commitEvent,
                         TransactionApplicationMode mode ) throws TransactionFailureException
     {
+        StatUtil.TimingContext timing = stat.time();
+
         ReplicatedTransaction transaction = createImmutableReplicatedTransaction( tx.transactionRepresentation() );
         Future<Object> futureTxId;
         try
@@ -58,7 +64,9 @@ public class ReplicatedTransactionCommitProcess implements TransactionCommitProc
 
         try
         {
-            return (long) futureTxId.get();
+            long txId = (long) futureTxId.get();
+            timing.end();
+            return txId;
         }
         catch ( ExecutionException e )
         {

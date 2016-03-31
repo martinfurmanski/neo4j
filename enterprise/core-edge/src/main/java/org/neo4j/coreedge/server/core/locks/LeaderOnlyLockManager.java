@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
+import org.neo4j.coreedge.helper.StatUtil;
 import org.neo4j.coreedge.raft.LeaderLocator;
 import org.neo4j.coreedge.raft.NoLeaderFoundException;
 import org.neo4j.coreedge.raft.replication.Replicator;
@@ -66,6 +67,9 @@ public class LeaderOnlyLockManager<MEMBER> implements Locks
     private final long leaderLockTokenTimeout;
     private final ReplicatedLockTokenStateMachine lockTokenStateMachine;
 
+    StatUtil.StatContext statToken;
+    StatUtil.StatContext statLocks;
+
     public LeaderOnlyLockManager(
             MEMBER myself, Replicator replicator, LeaderLocator<MEMBER> leaderLocator,
             Locks localLocks, long leaderLockTokenTimeout, ReplicatedLockTokenStateMachine lockTokenStateMachine )
@@ -76,6 +80,9 @@ public class LeaderOnlyLockManager<MEMBER> implements Locks
         this.localLocks = localLocks;
         this.leaderLockTokenTimeout = leaderLockTokenTimeout;
         this.lockTokenStateMachine = lockTokenStateMachine;
+
+        statToken = StatUtil.create( "lock-token-" + myself, 30000, true );
+        statLocks = StatUtil.create( "locks-" + myself, 30000, true );
     }
 
     @Override
@@ -102,7 +109,8 @@ public class LeaderOnlyLockManager<MEMBER> implements Locks
         ReplicatedLockTokenRequest<MEMBER> lockTokenRequest =
                 new ReplicatedLockTokenRequest<>( myself, LockToken.nextCandidateId( currentToken.id() ) );
 
-        Future<Object> future = null;
+        StatUtil.TimingContext timing = statToken.time();
+        Future<Object> future;
         try
         {
             future = replicator.replicate( lockTokenRequest, true );
@@ -115,6 +123,8 @@ public class LeaderOnlyLockManager<MEMBER> implements Locks
         try
         {
             boolean success = (boolean) future.get( leaderLockTokenTimeout, MILLISECONDS );
+            timing.end();
+
             if( success )
             {
                 return lockTokenRequest.id();
@@ -202,14 +212,19 @@ public class LeaderOnlyLockManager<MEMBER> implements Locks
         @Override
         public void acquireShared( ResourceType resourceType, long resourceId ) throws AcquireLockTimeoutException
         {
+            StatUtil.TimingContext timing = statLocks.time();
             localClient.acquireShared( resourceType, resourceId );
+            timing.end();
         }
 
         @Override
         public void acquireExclusive( ResourceType resourceType, long resourceId ) throws AcquireLockTimeoutException
         {
             ensureHoldingToken();
+
+            StatUtil.TimingContext timing = statLocks.time();
             localClient.acquireExclusive( resourceType, resourceId );
+            timing.end();
         }
 
         @Override

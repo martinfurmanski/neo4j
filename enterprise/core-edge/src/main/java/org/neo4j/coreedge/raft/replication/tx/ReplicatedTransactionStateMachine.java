@@ -22,8 +22,10 @@ package org.neo4j.coreedge.raft.replication.tx;
 import java.io.IOException;
 import java.util.Optional;
 
+import org.neo4j.coreedge.helper.StatUtil;
 import org.neo4j.coreedge.raft.state.Result;
 import org.neo4j.coreedge.raft.state.StateMachine;
+import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.coreedge.server.core.RecoverTransactionLogState;
 import org.neo4j.coreedge.server.core.locks.ReplicatedLockTokenStateMachine;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
@@ -46,12 +48,15 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
     private final Log log;
 
     private long lastCommittedIndex = -1;
+    StatUtil.StatContext stat;
 
     public ReplicatedTransactionStateMachine( TransactionCommitProcess commitProcess,
                                               ReplicatedLockTokenStateMachine<MEMBER> lockStateMachine,
                                               LogProvider logProvider,
-                                              RecoverTransactionLogState recoverTransactionLogState )
+                                              RecoverTransactionLogState recoverTransactionLogState,
+                                              MEMBER myself )
     {
+        stat = StatUtil.create( "tx-state-machine-" + myself, 30000, true );
         this.commitProcess = commitProcess;
         this.lockTokenStateMachine = lockStateMachine;
         this.log = logProvider.getLog( getClass() );
@@ -73,6 +78,7 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
             return Optional.empty();
         }
 
+        StatUtil.TimingContext timing = stat.time();
         TransactionRepresentation tx;
 
         byte[] extraHeader = encodeLogIndexAsTxHeader( commandIndex );
@@ -91,6 +97,7 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
         try
         {
             long txId = commitProcess.commit( new TransactionToApply( tx ), CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );
+            timing.end();
             return Optional.of( Result.of( txId ) );
         }
         catch ( TransactionFailureException e )

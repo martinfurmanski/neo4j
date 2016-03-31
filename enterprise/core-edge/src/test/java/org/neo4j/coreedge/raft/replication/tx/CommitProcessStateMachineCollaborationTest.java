@@ -53,10 +53,10 @@ public class CommitProcessStateMachineCollaborationTest
         TransactionCommitProcess localCommitProcess = mock( TransactionCommitProcess.class );
         ReplicatedTransactionStateMachine<RaftTestMember> stateMachine = new ReplicatedTransactionStateMachine<>(
                 localCommitProcess, lockState( finalLockSessionId ), NullLogProvider.getInstance(),
-                recoverTransactionLogState );
+                recoverTransactionLogState, null );
 
         DirectReplicator<ReplicatedTransaction> replicator = new DirectReplicator<>( stateMachine );
-        ReplicatedTransactionCommitProcess commitProcess = new ReplicatedTransactionCommitProcess( replicator );
+        ReplicatedTransactionCommitProcess commitProcess = new ReplicatedTransactionCommitProcess( replicator, null );
 
         // when
         try
