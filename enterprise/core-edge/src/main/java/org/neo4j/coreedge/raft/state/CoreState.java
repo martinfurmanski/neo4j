@@ -250,15 +250,15 @@ public class CoreState extends LifecycleAdapter implements RaftStateMachine
     /**
      * Used for synchronizing with the internal executor, and also to start/stop it.
      *
-     * @param cancelTasks     Tries to cancel pending tasks.
-     * @param willContinue    The executor should continue to accept tasks.
+     * @param cancelTasks    Tries to cancel pending tasks.
+     * @param keepRunning    The executor should continue to accept tasks.
      *
      * @return Returns true if the executor managed to synchronize with the executor, meaning
      *         it successfully finished pending tasks and is now idle. Otherwise false.
      *
      * @throws InterruptedException
      */
-    boolean syncExecutor( boolean cancelTasks, boolean willContinue ) throws InterruptedException
+    boolean syncExecutor( boolean cancelTasks, boolean keepRunning ) throws InterruptedException
     {
         boolean isSuccess = true;
 
@@ -280,7 +280,7 @@ public class CoreState extends LifecycleAdapter implements RaftStateMachine
             }
         }
 
-        if( willContinue )
+        if( keepRunning )
         {
             applier = newSingleThreadExecutor( new NamedThreadFactory( "core-state-applier" ) );
         }

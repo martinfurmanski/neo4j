@@ -32,7 +32,6 @@ import static org.neo4j.coreedge.discovery.HazelcastServerLifecycle.TRANSACTION_
 
 public class HazelcastClusterTopology implements ClusterTopology
 {
-    public static final String EDGE_SERVERS = "edge-servers";
     private final Set<Member> hazelcastMembers;
 
     public HazelcastClusterTopology( Set<Member> hazelcastMembers )
@@ -41,7 +40,7 @@ public class HazelcastClusterTopology implements ClusterTopology
     }
 
     @Override
-    public boolean bootstrappable()
+    public boolean canBootstrapLocally()
     {
         Member firstMember = hazelcastMembers.iterator().next();
         return firstMember.localMember();

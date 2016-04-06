@@ -26,7 +26,7 @@ import java.util.Set;
 
 import org.neo4j.coreedge.raft.DelayedRenewableTimeoutService;
 import org.neo4j.coreedge.raft.RaftInstance;
-import org.neo4j.coreedge.raft.RaftInstance.BootstrapException;
+import org.neo4j.coreedge.discovery.BootstrapException;
 import org.neo4j.coreedge.raft.RaftInstanceBuilder;
 import org.neo4j.coreedge.raft.RaftStateMachine;
 import org.neo4j.coreedge.raft.RaftTestNetwork;

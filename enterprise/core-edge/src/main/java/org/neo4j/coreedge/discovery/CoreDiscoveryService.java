@@ -25,6 +25,8 @@ public interface CoreDiscoveryService extends EdgeDiscoveryService
 
     void removeMembershipListener( Listener listener );
 
+    void wasLocallyBootstrapped();
+
     interface Listener
     {
         void onTopologyChange( ClusterTopology clusterTopology );

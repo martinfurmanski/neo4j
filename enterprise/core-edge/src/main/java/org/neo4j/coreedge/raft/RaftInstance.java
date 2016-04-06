@@ -27,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import org.neo4j.coreedge.discovery.BootstrapException;
 import org.neo4j.coreedge.helper.VolatileFuture;
 import org.neo4j.coreedge.network.Message;
 import org.neo4j.coreedge.raft.log.RaftLog;
@@ -186,6 +187,11 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
             databaseHealthSupplier.get().panic( e );
             throw new BootstrapException( e );
         }
+    }
+
+    public boolean isBootstrapped()
+    {
+        return entryLog.appendIndex() >= 0;
     }
 
     public void setTargetMembershipSet( Set<MEMBER> targetMembers )
@@ -383,14 +389,6 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>, Inbound.Mess
     public String toString()
     {
         return format( "RaftInstance{role=%s, term=%d, currentMembers=%s}", currentRole, term(), votingMembers() );
-    }
-
-    public static class BootstrapException extends Exception
-    {
-        public BootstrapException( Throwable cause )
-        {
-            super( cause );
-        }
     }
 
     public long term()

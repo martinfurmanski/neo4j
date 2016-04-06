@@ -27,7 +27,6 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import org.neo4j.coreedge.discovery.Cluster;
-import org.neo4j.coreedge.discovery.TestOnlyDiscoveryServiceFactory;
 import org.neo4j.coreedge.raft.roles.Role;
 import org.neo4j.coreedge.server.CoreEdgeClusterSettings;
 import org.neo4j.coreedge.server.core.CoreGraphDatabase;
@@ -65,7 +64,7 @@ public class CoreToCoreCopySnapshotIT
     {
         // given
         File dbDir = dir.directory();
-        cluster = Cluster.start( dbDir, 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dbDir, 3, 0 );
 
         CoreGraphDatabase leader = cluster.awaitLeader( TIMEOUT_MS );
 
@@ -82,7 +81,7 @@ public class CoreToCoreCopySnapshotIT
     {
         // given
         File dbDir = dir.directory();
-        cluster = Cluster.start( dbDir, 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dbDir, 3, 0 );
 
         CoreGraphDatabase source =
                 cluster.coreTx( ( db, tx ) -> {
@@ -104,7 +103,7 @@ public class CoreToCoreCopySnapshotIT
     {
         // given
         File dbDir = dir.directory();
-        cluster = Cluster.start( dbDir, 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dbDir, 3, 0 );
 
         CoreGraphDatabase source =
                 cluster.coreTx( ( db, tx ) -> {
@@ -130,7 +129,7 @@ public class CoreToCoreCopySnapshotIT
                 CoreEdgeClusterSettings.raft_log_pruning.name(), "3 entries",
                 CoreEdgeClusterSettings.raft_log_rotation_size.name(), "1K" );
 
-        cluster = Cluster.start( dbDir, 3, 0, params, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dbDir, 3, 0, params );
 
         CoreGraphDatabase source =
                 cluster.coreTx( ( db, tx ) -> {

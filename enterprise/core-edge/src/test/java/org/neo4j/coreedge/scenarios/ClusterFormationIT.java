@@ -27,16 +27,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.neo4j.coreedge.discovery.Cluster;
-import org.neo4j.coreedge.discovery.TestOnlyDiscoveryServiceFactory;
 import org.neo4j.coreedge.raft.roles.Role;
 import org.neo4j.coreedge.server.core.CoreGraphDatabase;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.rule.TargetDirectory;
 
-import static org.junit.Assert.assertEquals;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.neo4j.test.assertion.Assert.assertEventually;
 
 public class ClusterFormationIT
 {
+    private final int DEFAULT_TIMEOUT_MS = 15_000;
+
     @Rule
     public final TargetDirectory.TestDirectory dir = TargetDirectory.testDirForTest( getClass() );
 
@@ -51,40 +54,39 @@ public class ClusterFormationIT
         }
     }
 
+    private void assertEventuallyNumberOfCoreServers( int expected ) throws InterruptedException
+    {
+        assertEventually( "core servers", () -> cluster.numberOfCoreServers(), equalTo( expected ), DEFAULT_TIMEOUT_MS, MILLISECONDS );
+    }
+
     @Test
     public void shouldBeAbleToAddAndRemoveCoreServers() throws Exception
     {
         // given
-        cluster = Cluster.start( dir.directory(), 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dir.directory(), 3, 0 );
 
-        // when
+        // when/then
         cluster.removeCoreServerWithServerId( 0 );
         cluster.addCoreServerWithServerId( 0, 3 );
+        assertEventuallyNumberOfCoreServers( 3 );
 
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
-
-        // when
+        // when/then
         cluster.removeCoreServerWithServerId( 1 );
+        assertEventuallyNumberOfCoreServers( 2 );
 
-        // then
-        assertEquals( 2, cluster.numberOfCoreServers() );
-
-        // when
+        // when/then
         cluster.addCoreServerWithServerId( 4, 3 );
-
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
+        assertEventuallyNumberOfCoreServers( 3 );
     }
 
     @Test
     public void shouldBeAbleToAddAndRemoveCoreServersUnderModestLoad() throws Exception
     {
         // given
-        cluster = Cluster.start( dir.directory(), 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dir.directory(), 3, 0 );
 
         ExecutorService executorService = Executors.newSingleThreadExecutor();
-        executorService.submit( (Runnable) () -> {
+        executorService.submit( () -> {
             CoreGraphDatabase leader = cluster.getDbWithRole( Role.LEADER );
             try ( Transaction tx = leader.beginTx() )
             {
@@ -93,24 +95,21 @@ public class ClusterFormationIT
             }
         } );
 
-        // when
+        // when/then
         cluster.removeCoreServerWithServerId( 0 );
+        assertEventuallyNumberOfCoreServers( 2 );
+
+        // when/then
         cluster.addCoreServerWithServerId( 0, 3 );
+        assertEventuallyNumberOfCoreServers( 3 );
 
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
-
-        // when
+        // when/then
         cluster.removeCoreServerWithServerId( 1 );
+        assertEventuallyNumberOfCoreServers( 2 );
 
-        // then
-        assertEquals( 2, cluster.numberOfCoreServers() );
-
-        // when
+        // when/then
         cluster.addCoreServerWithServerId( 4, 3 );
-
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
+        assertEventuallyNumberOfCoreServers( 3 );
 
         executorService.shutdown();
     }
@@ -118,26 +117,24 @@ public class ClusterFormationIT
     @Test
     public void shouldBeAbleToRestartTheCluster() throws Exception
     {
-        // when
-        final TestOnlyDiscoveryServiceFactory discoveryServiceFactory = new TestOnlyDiscoveryServiceFactory();
-        cluster = Cluster.start( dir.directory(), 3, 0, discoveryServiceFactory );
+        // when/then
+        cluster = Cluster.start( dir.directory(), 3, 0 );
+        assertEventuallyNumberOfCoreServers( 3 );
 
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
-
-        // when
+        // when/then
         cluster.shutdown();
-        cluster = Cluster.start( dir.directory(), 3, 0, discoveryServiceFactory );
+        cluster = Cluster.start( dir.directory(), 3, 0 );
 
-        // then
-        assertEquals( 3, cluster.numberOfCoreServers() );
+        // when/then
+        assertEventuallyNumberOfCoreServers( 3 );
 
-        // when
+        // when/then
         cluster.removeCoreServerWithServerId( 1 );
         cluster.addCoreServerWithServerId( 3, 3 );
         cluster.shutdown();
-        cluster = Cluster.start( dir.directory(), 3, 0, discoveryServiceFactory );
+        cluster = Cluster.start( dir.directory(), 3, 0 );
 
-        assertEquals( 3, cluster.numberOfCoreServers() );
+        //then
+        assertEventuallyNumberOfCoreServers( 3 );
     }
 }

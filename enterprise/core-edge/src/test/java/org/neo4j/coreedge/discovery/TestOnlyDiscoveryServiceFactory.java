@@ -28,7 +28,7 @@ import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.logging.LogProvider;
 
-public class TestOnlyDiscoveryServiceFactory implements DiscoveryServiceFactory
+public class TestOnlyDiscoveryServiceFactory
 {
     protected final Set<CoreMember> coreMembers = new TreeSet<>( ( o1, o2 ) -> {
         if ( o1 == null && o2 == null )
@@ -65,13 +65,11 @@ public class TestOnlyDiscoveryServiceFactory implements DiscoveryServiceFactory
 
     protected final Set<InstanceId> edgeMembers = new CopyOnWriteArraySet<>();
 
-    @Override
     public CoreDiscoveryService coreDiscoveryService( Config config )
     {
         return new TestOnlyCoreDiscoveryService( config, this );
     }
 
-    @Override
     public EdgeDiscoveryService edgeDiscoveryService( Config config, LogProvider logProvider )
     {
         return new TestOnlyEdgeDiscoveryService( config, this );

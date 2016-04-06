@@ -67,15 +67,17 @@ public class Cluster
     private static final int DEFAULT_BACKOFF_MS = 100;
 
     private final File parentDir;
-    private final DiscoveryServiceFactory discoveryServiceFactory;
     private Set<CoreGraphDatabase> coreServers = new HashSet<>();
     private Set<EdgeGraphDatabase> edgeServers = new HashSet<>();
 
-    Cluster( File parentDir, int noOfCoreServers, int noOfEdgeServers, DiscoveryServiceFactory discoveryServiceFactory,
-             Map<String,String> coreParams )
+    Cluster( File parentDir, int noOfCoreServers, int noOfEdgeServers, Map<String,String> coreParams )
             throws ExecutionException, InterruptedException
     {
-        this.discoveryServiceFactory = discoveryServiceFactory;
+        if( noOfEdgeServers > 0 )
+        {
+            throw new UnsupportedOperationException();
+        }
+
         List<AdvertisedSocketAddress> initialHosts = buildAddresses( noOfCoreServers );
         this.parentDir = parentDir;
 
@@ -91,30 +93,16 @@ public class Cluster
         }
     }
 
-    public static Cluster start( File parentDir, int noOfCoreServers, int noOfEdgeServers,
-                                 DiscoveryServiceFactory discoveryServiceFactory )
-            throws ExecutionException, InterruptedException
-    {
-        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, discoveryServiceFactory, stringMap() );
-    }
-
     public static Cluster start( File parentDir, int noOfCoreServers, int noOfEdgeServers )
             throws ExecutionException, InterruptedException
     {
-        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, new HazelcastDiscoveryServiceFactory(), stringMap() );
+        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, stringMap() );
     }
 
     public static Cluster start( File parentDir, int noOfCoreServers, int noOfEdgeServers, Map<String,String> coreParams )
             throws ExecutionException, InterruptedException
     {
-        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, new HazelcastDiscoveryServiceFactory(), coreParams );
-    }
-
-    public static Cluster start( File parentDir, int noOfCoreServers, int noOfEdgeServers,
-                                 Map<String,String> coreParams, DiscoveryServiceFactory discoveryServiceFactory )
-            throws ExecutionException, InterruptedException
-    {
-        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, discoveryServiceFactory, coreParams );
+        return new Cluster( parentDir, noOfCoreServers, noOfEdgeServers, coreParams );
     }
 
     private static File coreServerStoreDirectory( File parentDir, int serverId )
@@ -212,8 +200,7 @@ public class Cluster
 
         final File storeDir = coreServerStoreDirectory( parentDir, serverId );
         params.put( GraphDatabaseSettings.logs_directory.name(), storeDir.getAbsolutePath() );
-        return new CoreGraphDatabase( storeDir, params, GraphDatabaseDependencies.newDependencies(),
-                discoveryServiceFactory );
+        return new CoreGraphDatabase( storeDir, params, GraphDatabaseDependencies.newDependencies() );
     }
 
     public EdgeGraphDatabase startEdgeServer( int serverId, List<AdvertisedSocketAddress> addresses )
@@ -231,8 +218,7 @@ public class Cluster
         params.put( GraphDatabaseSettings.pagecache_memory.name(), "8m" );
         params.put( GraphDatabaseSettings.auth_store.name(), new File(parentDir, "auth").getAbsolutePath() );
         params.put( GraphDatabaseSettings.logs_directory.name(), storeDir.getAbsolutePath() );
-        return new EdgeGraphDatabase( storeDir, params, GraphDatabaseDependencies.newDependencies(),
-                discoveryServiceFactory );
+        return new EdgeGraphDatabase( storeDir, params, GraphDatabaseDependencies.newDependencies() );
     }
 
     public void shutdown()
@@ -383,7 +369,8 @@ public class Cluster
 
     public GraphDatabaseService findAnEdgeServer()
     {
-        return edgeServers.iterator().next();
+        throw new UnsupportedOperationException(); // TODO Edge discovery
+//        return edgeServers.iterator().next();
     }
 
     public CoreGraphDatabase getDbWithRole( Role role )
@@ -427,6 +414,7 @@ public class Cluster
 
     public int numberOfCoreServers()
     {
+        // TODO: This is not good. Tests should check so that they all eventually see the same state.
         CoreGraphDatabase aCoreGraphDb = coreServers.iterator().next();
         CoreDiscoveryService coreDiscoveryService = aCoreGraphDb.getDependencyResolver()
                 .resolveDependency( CoreDiscoveryService.class );

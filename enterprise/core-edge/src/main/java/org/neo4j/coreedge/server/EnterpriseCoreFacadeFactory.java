@@ -19,7 +19,6 @@
  */
 package org.neo4j.coreedge.server;
 
-import org.neo4j.coreedge.discovery.DiscoveryServiceFactory;
 import org.neo4j.coreedge.server.core.EnterpriseCoreEditionModule;
 import org.neo4j.kernel.impl.factory.DatabaseInfo;
 import org.neo4j.kernel.impl.factory.Edition;
@@ -29,18 +28,11 @@ import org.neo4j.kernel.impl.factory.PlatformModule;
 
 public class EnterpriseCoreFacadeFactory extends EnterpriseCoreEdgeFacadeFactory
 {
-    private final DiscoveryServiceFactory discoveryServiceFactory;
-
-    public EnterpriseCoreFacadeFactory( DiscoveryServiceFactory discoveryServiceFactory )
-    {
-        this.discoveryServiceFactory = discoveryServiceFactory;
-    }
-
     @Override
     protected EditionModule createEdition( PlatformModule platformModule )
     {
         makeHazelcastQuiet( platformModule );
-        return new EnterpriseCoreEditionModule( platformModule, discoveryServiceFactory );
+        return new EnterpriseCoreEditionModule( platformModule );
     }
 
     @Override

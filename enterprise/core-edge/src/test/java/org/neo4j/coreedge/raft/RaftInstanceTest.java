@@ -25,6 +25,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.IOException;
 
+import org.neo4j.coreedge.discovery.BootstrapException;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogCursor;
@@ -423,7 +424,7 @@ public class RaftInstanceTest
             raft.bootstrapWithInitialMembers( new RaftTestGroup( asSet( myself, member1, member2 ) ) );
             fail( "Contract expects exception so that others can take remedial action" );
         }
-        catch ( RaftInstance.BootstrapException e )
+        catch ( BootstrapException e )
         {
             // then
             assertTrue( databaseHealth.hasPanicked() );

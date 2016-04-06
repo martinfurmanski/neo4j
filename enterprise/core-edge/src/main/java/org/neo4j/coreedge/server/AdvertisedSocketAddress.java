@@ -33,12 +33,16 @@ import org.neo4j.coreedge.raft.state.ChannelMarshal;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
-public class AdvertisedSocketAddress
+public class AdvertisedSocketAddress implements Comparable<AdvertisedSocketAddress>
 {
     private final String address;
 
     public AdvertisedSocketAddress( String address )
     {
+        if( address.equals( "localhost" ))
+        {
+            System.out.println();
+        }
         this.address = address;
     }
 
@@ -72,6 +76,12 @@ public class AdvertisedSocketAddress
     {
         String[] split = address.split( ":" );
         return new InetSocketAddress( split[0], Integer.valueOf( split[1] ) );
+    }
+
+    @Override
+    public int compareTo( AdvertisedSocketAddress o )
+    {
+        return address.compareTo( o.address );
     }
 
     public static class AdvertisedSocketAddressByteBufferMarshal implements ByteBufferMarshal<AdvertisedSocketAddress>

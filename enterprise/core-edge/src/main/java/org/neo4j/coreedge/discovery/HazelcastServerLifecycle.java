@@ -91,6 +91,12 @@ public class HazelcastServerLifecycle extends LifecycleAdapter implements CoreDi
         }
     }
 
+    @Override
+    public void wasLocallyBootstrapped()
+    {
+        // not used
+    }
+
     public Set<Member> getMembers()
     {
         return hazelcastInstance.getCluster().getMembers();

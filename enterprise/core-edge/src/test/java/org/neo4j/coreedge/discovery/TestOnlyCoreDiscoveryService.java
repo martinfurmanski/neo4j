@@ -77,6 +77,13 @@ public class TestOnlyCoreDiscoveryService extends LifecycleAdapter implements Co
     }
 
     @Override
+    public void wasLocallyBootstrapped()
+    {
+        // TODO
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void start() throws Throwable
     {
         notifyListeners( cluster.membershipListeners, listener -> listener.onTopologyChange( currentTopology() ) );

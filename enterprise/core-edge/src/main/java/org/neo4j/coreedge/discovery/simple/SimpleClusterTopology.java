@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2016 "Neo Technology,"
+ * Copyright (c) 2002-2015 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -17,61 +17,58 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.coreedge.discovery;
+package org.neo4j.coreedge.discovery.simple;
 
-import java.util.ArrayList;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeSet;
 
-import org.neo4j.cluster.InstanceId;
+import org.neo4j.coreedge.discovery.ClusterTopology;
 import org.neo4j.coreedge.server.AdvertisedSocketAddress;
 import org.neo4j.coreedge.server.CoreMember;
 import org.neo4j.helpers.collection.Iterables;
 
-public class TestOnlyClusterTopology implements ClusterTopology
+class SimpleClusterTopology implements ClusterTopology
 {
-    private final ArrayList<CoreMember> coreMembers;
-    private final Set<InstanceId> edgeMembers;
-    private final boolean canBeBootstrapped;
+    private final Set<CoreMember> members;
+    private final boolean canBoostrap;
 
-    public TestOnlyClusterTopology( boolean canBeBootstrapped, Set<CoreMember> coreMembers, Set<InstanceId> edgeMembers )
+    SimpleClusterTopology( SortedMap<CoreMember,DiscoveryInfo> infoMap, boolean canBoostrap )
     {
-        this.canBeBootstrapped = canBeBootstrapped;
-        this.edgeMembers = edgeMembers;
-        this.coreMembers = new ArrayList<>( coreMembers );
+        this.members = new TreeSet<>( infoMap.keySet() );
+        this.canBoostrap = canBoostrap;
     }
 
     @Override
     public AdvertisedSocketAddress firstTransactionServer()
     {
-        return coreMembers.size() > 0 ? coreMembers.get( 0 ).getCoreAddress() : null;
+        return Iterables.first( members ).getCoreAddress();
     }
 
     @Override
     public int getNumberOfCoreServers()
     {
-        return coreMembers.size();
+        return members.size();
     }
 
     @Override
     public Set<CoreMember> getMembers()
     {
-        return Iterables.asSet( coreMembers );
+        return members;
     }
 
     @Override
     public boolean canBootstrapLocally()
     {
-        // Can only bootstrap for a cluster with multiple instances
-        return canBeBootstrapped && coreMembers.size() > 1;
+        return canBoostrap;
     }
 
     @Override
     public String toString()
     {
-        return "TestOnlyClusterTopology{" +
-               "coreMembers.size()=" + coreMembers.size() +
-               ", bootstrappable=" + canBootstrapLocally() +
-               ", edgeMembers.size()=" + edgeMembers.size() +
+        return "SimpleClusterTopology{" +
+               "members=" + members +
+               ", canBoostrap=" + canBoostrap +
                '}';
     }
 }

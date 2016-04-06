@@ -27,7 +27,6 @@ import org.junit.Test;
 
 import org.neo4j.coreedge.convert.ConvertClassicStoreCommand;
 import org.neo4j.coreedge.discovery.Cluster;
-import org.neo4j.coreedge.discovery.TestOnlyDiscoveryServiceFactory;
 import org.neo4j.coreedge.server.core.CoreGraphDatabase;
 import org.neo4j.function.ThrowingSupplier;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -84,7 +83,7 @@ public class ConvertNonCoreEdgeStoreIT
             new ConvertClassicStoreCommand( destination ).execute();
         }
 
-        cluster = Cluster.start( dbDir, 3, 0, new TestOnlyDiscoveryServiceFactory() );
+        cluster = Cluster.start( dbDir, 3, 0 );
 
         // when
         GraphDatabaseService coreDB = cluster.awaitLeader( 5000 );

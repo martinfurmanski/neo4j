@@ -64,9 +64,10 @@ public class MembershipWaiter<MEMBER>
     {
         CompletableFuture<Boolean> catchUpFuture = new CompletableFuture<>();
 
+        // TODO: Replace polling with proper waiting.
         JobScheduler.JobHandle jobHandle = jobScheduler.scheduleRecurring(
                 new JobScheduler.Group( getClass().toString(), POOLED ),
-                new Evaluator( raftState, catchUpFuture ), maxCatchupLag, MILLISECONDS );
+                new Evaluator( raftState, catchUpFuture ), maxCatchupLag/10, MILLISECONDS );
 
         catchUpFuture.whenComplete( ( result, e ) -> jobHandle.cancel( true ) );
 

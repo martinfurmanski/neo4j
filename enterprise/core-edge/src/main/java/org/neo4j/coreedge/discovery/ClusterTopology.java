@@ -19,7 +19,6 @@
  */
 package org.neo4j.coreedge.discovery;
 
-import java.util.Collections;
 import java.util.Set;
 
 import org.neo4j.coreedge.server.AdvertisedSocketAddress;
@@ -27,38 +26,11 @@ import org.neo4j.coreedge.server.CoreMember;
 
 public interface ClusterTopology
 {
-    ClusterTopology EMPTY = new ClusterTopology()
-    {
-        @Override
-        public AdvertisedSocketAddress firstTransactionServer()
-        {
-            throw new RuntimeException( "No core server found" );
-        }
-
-        @Override
-        public int getNumberOfCoreServers()
-        {
-            return 0;
-        }
-
-        @Override
-        public Set<CoreMember> getMembers()
-        {
-            return Collections.<CoreMember>emptySet();
-        }
-
-        @Override
-        public boolean bootstrappable()
-        {
-            return false;
-        }
-    };
-
     AdvertisedSocketAddress firstTransactionServer();
 
     int getNumberOfCoreServers();
 
     Set<CoreMember> getMembers();
 
-    boolean bootstrappable();
+    boolean canBootstrapLocally();
 }

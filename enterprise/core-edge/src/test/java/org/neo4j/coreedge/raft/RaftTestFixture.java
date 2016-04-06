@@ -24,7 +24,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.neo4j.coreedge.raft.RaftInstance.BootstrapException;
+import org.neo4j.coreedge.discovery.BootstrapException;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLog;
 import org.neo4j.coreedge.raft.log.RaftLogCompactedException;

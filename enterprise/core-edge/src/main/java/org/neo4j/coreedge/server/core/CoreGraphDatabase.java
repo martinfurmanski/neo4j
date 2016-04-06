@@ -24,8 +24,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.neo4j.coreedge.catchup.storecopy.StoreCopyFailedException;
-import org.neo4j.coreedge.discovery.DiscoveryServiceFactory;
-import org.neo4j.coreedge.discovery.HazelcastDiscoveryServiceFactory;
+
 import org.neo4j.coreedge.raft.roles.Role;
 import org.neo4j.coreedge.server.AdvertisedSocketAddress;
 import org.neo4j.coreedge.server.CoreMember;
@@ -38,18 +37,10 @@ public class CoreGraphDatabase extends GraphDatabaseFacade
     private final CoreEditionSPI coreEditionSPI;
 
     public CoreGraphDatabase( File storeDir, Map<String, String> params,
-                              GraphDatabaseFacadeFactory.Dependencies dependencies,
-                              DiscoveryServiceFactory discoveryServiceFactory )
-    {
-        GraphDatabaseFacade coreGraphDatabaseFacade =
-                new EnterpriseCoreFacadeFactory( discoveryServiceFactory ).initFacade( storeDir, params, dependencies, this );
-        coreEditionSPI = (CoreEditionSPI) coreGraphDatabaseFacade.editionSPI();
-    }
-
-    public CoreGraphDatabase( File storeDir, Map<String, String> params,
                               GraphDatabaseFacadeFactory.Dependencies dependencies )
     {
-        this( storeDir, params, dependencies, new HazelcastDiscoveryServiceFactory() );
+        GraphDatabaseFacade coreGraphDatabaseFacade = new EnterpriseCoreFacadeFactory().initFacade( storeDir, params, dependencies, this );
+        coreEditionSPI = (CoreEditionSPI) coreGraphDatabaseFacade.editionSPI();
     }
 
     public CoreMember id()

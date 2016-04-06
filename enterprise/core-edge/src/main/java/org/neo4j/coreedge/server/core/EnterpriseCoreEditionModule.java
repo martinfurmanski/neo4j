@@ -41,8 +41,8 @@ import org.neo4j.coreedge.catchup.storecopy.edge.state.StateFetcher;
 import org.neo4j.coreedge.catchup.tx.edge.TransactionLogCatchUpFactory;
 import org.neo4j.coreedge.catchup.tx.edge.TxPullClient;
 import org.neo4j.coreedge.discovery.CoreDiscoveryService;
-import org.neo4j.coreedge.discovery.DiscoveryServiceFactory;
 import org.neo4j.coreedge.discovery.RaftDiscoveryServiceConnector;
+import org.neo4j.coreedge.discovery.simple.SimpleDiscoveryServiceFactory;
 import org.neo4j.coreedge.raft.DelayedRenewableTimeoutService;
 import org.neo4j.coreedge.raft.LeaderLocator;
 import org.neo4j.coreedge.raft.RaftInstance;
@@ -216,8 +216,7 @@ public class EnterpriseCoreEditionModule
         return this;
     }
 
-    public EnterpriseCoreEditionModule( final PlatformModule platformModule,
-                                        DiscoveryServiceFactory discoveryServiceFactory )
+    public EnterpriseCoreEditionModule( final PlatformModule platformModule )
     {
         ioLimiter = new ConfigurableIOLimiter( platformModule.config );
         formats = HighLimit.RECORD_FORMATS;
@@ -234,10 +233,6 @@ public class EnterpriseCoreEditionModule
         LogProvider logProvider = logging.getInternalLogProvider();
 
         final Supplier<DatabaseHealth> databaseHealthSupplier = dependencies.provideDependency( DatabaseHealth.class );
-
-        CoreDiscoveryService discoveryService =
-                discoveryServiceFactory.coreDiscoveryService( config );
-        life.add( dependencies.satisfyDependency( discoveryService ) );
 
         final CoreReplicatedContentMarshal marshal = new CoreReplicatedContentMarshal();
         int maxQueueSize = config.get( CoreEdgeClusterSettings.outgoing_queue_size );
@@ -273,6 +268,10 @@ public class EnterpriseCoreEditionModule
                 databaseHealthSupplier );
 
         MonitoredRaftLog raftLog = new MonitoredRaftLog( underlyingLog, platformModule.monitors );
+
+        // CoreDiscoveryService discoveryService = new HazelcastServerLifecycle( config );
+        CoreDiscoveryService discoveryService = SimpleDiscoveryServiceFactory.coreDiscoveryService( config );
+        life.add( dependencies.satisfyDependency( discoveryService ) );
 
         LocalDatabase localDatabase = new LocalDatabase( platformModule.storeDir,
                 new CopiedStoreRecovery( config, platformModule.kernelExtensions.listFactories(),
@@ -650,7 +649,7 @@ public class EnterpriseCoreEditionModule
                 new RaftOutbound( outbound ), logProvider,
                 raftMembershipManager, logShipping, databaseHealthSupplier, monitors );
 
-        life.add( new RaftDiscoveryServiceConnector( discoveryService, raftInstance ) );
+        life.add( new RaftDiscoveryServiceConnector( discoveryService, raftInstance, logProvider, isBootstrapped( raftLog ) ) );
 
         life.add( new LifecycleAdapter()
         {
@@ -662,6 +661,11 @@ public class EnterpriseCoreEditionModule
         } );
 
         return raftInstance;
+    }
+
+    private static boolean isBootstrapped( RaftLog raftLog )
+    {
+        return raftLog.appendIndex() >= 0;
     }
 
     private static PrintWriter raftMessagesLog( File storeDir )

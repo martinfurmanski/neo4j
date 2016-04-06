@@ -34,8 +34,9 @@ import org.neo4j.coreedge.catchup.tx.edge.TransactionApplier;
 import org.neo4j.coreedge.catchup.tx.edge.TransactionLogCatchUpFactory;
 import org.neo4j.coreedge.catchup.tx.edge.TxPollingClient;
 import org.neo4j.coreedge.catchup.tx.edge.TxPullClient;
-import org.neo4j.coreedge.discovery.DiscoveryServiceFactory;
 import org.neo4j.coreedge.discovery.EdgeDiscoveryService;
+import org.neo4j.coreedge.discovery.HazelcastClient;
+import org.neo4j.coreedge.discovery.HazelcastClientConnector;
 import org.neo4j.coreedge.raft.replication.tx.ExponentialBackoffStrategy;
 import org.neo4j.coreedge.server.CoreEdgeClusterSettings;
 import org.neo4j.coreedge.server.Expiration;
@@ -46,33 +47,32 @@ import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.DatabaseAvailability;
-import org.neo4j.kernel.impl.enterprise.EnterpriseConstraintSemantics;
-import org.neo4j.kernel.impl.store.format.highlimit.HighLimit;
-import org.neo4j.kernel.internal.DatabaseHealth;
-import org.neo4j.kernel.internal.GraphDatabaseAPI;
-import org.neo4j.kernel.internal.KernelData;
 import org.neo4j.kernel.NeoStoreDataSource;
-import org.neo4j.kernel.internal.Version;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.impl.api.CommitProcessFactory;
 import org.neo4j.kernel.impl.api.ReadOnlyTransactionCommitProcess;
-import org.neo4j.kernel.impl.constraints.StandardConstraintSemantics;
 import org.neo4j.kernel.impl.core.DelegatingLabelTokenHolder;
 import org.neo4j.kernel.impl.core.DelegatingPropertyKeyTokenHolder;
 import org.neo4j.kernel.impl.core.DelegatingRelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.ReadOnlyTokenCreator;
 import org.neo4j.kernel.impl.coreapi.CoreAPIAvailabilityGuard;
+import org.neo4j.kernel.impl.enterprise.EnterpriseConstraintSemantics;
 import org.neo4j.kernel.impl.enterprise.transaction.log.checkpoint.ConfigurableIOLimiter;
 import org.neo4j.kernel.impl.factory.DatabaseInfo;
 import org.neo4j.kernel.impl.factory.EditionModule;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacade;
 import org.neo4j.kernel.impl.factory.PlatformModule;
 import org.neo4j.kernel.impl.logging.LogService;
+import org.neo4j.kernel.impl.store.format.highlimit.HighLimit;
 import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.stats.IdBasedStoreEntityCounters;
 import org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
+import org.neo4j.kernel.internal.DatabaseHealth;
+import org.neo4j.kernel.internal.GraphDatabaseAPI;
+import org.neo4j.kernel.internal.KernelData;
+import org.neo4j.kernel.internal.Version;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.kernel.lifecycle.LifecycleStatus;
@@ -89,8 +89,7 @@ import static org.neo4j.kernel.impl.factory.CommunityEditionModule.createLockMan
  */
 public class EnterpriseEdgeEditionModule extends EditionModule
 {
-    public EnterpriseEdgeEditionModule( final PlatformModule platformModule,
-                                        DiscoveryServiceFactory discoveryServiceFactory )
+    public EnterpriseEdgeEditionModule( final PlatformModule platformModule )
     {
         ioLimiter = new ConfigurableIOLimiter( platformModule.config );
         formats = HighLimit.RECORD_FORMATS;
@@ -137,8 +136,8 @@ public class EnterpriseEdgeEditionModule extends EditionModule
 
         LogProvider logProvider = platformModule.logging.getInternalLogProvider();
 
-        EdgeDiscoveryService discoveryService = discoveryServiceFactory.edgeDiscoveryService( config, logProvider);
-        life.add(dependencies.satisfyDependency( discoveryService ));
+        EdgeDiscoveryService discoveryService = new HazelcastClient( new HazelcastClientConnector( config ), logProvider );
+        life.add( dependencies.satisfyDependency( discoveryService ) );
 
         Supplier<TransactionApplier> transactionApplierSupplier =
                 () -> new TransactionApplier( platformModule.dependencies );

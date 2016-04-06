@@ -32,7 +32,7 @@ import org.neo4j.storageengine.api.WritableChannel;
 
 import static java.lang.String.format;
 
-public class CoreMember
+public class CoreMember implements Comparable<CoreMember>
 {
     private final AdvertisedSocketAddress coreAddress;
     private final AdvertisedSocketAddress raftAddress;
@@ -47,6 +47,12 @@ public class CoreMember
     public String toString()
     {
         return format( "CoreMember{coreAddress=%s, raftAddress=%s}", coreAddress, raftAddress );
+    }
+
+    @Override
+    public int compareTo( CoreMember o )
+    {
+        return coreAddress.compareTo( o.coreAddress );
     }
 
     @Override
