@@ -183,10 +183,6 @@ public class CoreEdgeClusterSettings
     public static final Setting<Long> raft_log_rotation_size =
             setting( "core_edge.raft_log_rotation_size", BYTES, "1M", min( 1024L ) );
 
-    @Description("RAFT meta data cache size (in unit of entries)")
-    public static final Setting<Integer> raft_log_meta_data_cache_size =
-            setting( "core_edge.raft_log_meta_data_cache_size", INTEGER, "100000" );
-
     @Description("RAFT entry cache size (in unit of entries)")
     public static final Setting<Integer> raft_log_entry_cache_size =
             setting( "core_edge.raft_log_entry_cache_size", INTEGER, "32" );

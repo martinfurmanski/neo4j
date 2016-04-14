@@ -17,24 +17,33 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.coreedge.raft.log;
+package org.neo4j.coreedge.raft.log.physical;
 
-/**
- * Thrown when the RAFT log cannot be read at the supplied index.
- */
-public class RaftLogCompactedException extends Exception
+public class HeaderBuilder
 {
-    public RaftLogCompactedException()
-    {
-    }
-
-    public RaftLogCompactedException( String message )
-    {
-        super( message );
-    }
-
-    public RaftLogCompactedException( Exception e )
-    {
-        super( e );
-    }
+//    public long version;
+//    public long prevIndex;
+//    public long prevTerm;
+//
+//    public static HeaderBuilder version(long version)
+//    {
+//        return new HeaderBuilder( version );
+//    }
+//
+//    public HeaderBuilder( long version )
+//    {
+//        this.version = version;
+//    }
+//
+//    public HeaderBuilder prevIndex( long prevIndex )
+//    {
+//        this.prevIndex = prevIndex;
+//        return this;
+//    }
+//
+//    public SegmentHeader prevTerm( long prevTerm )
+//    {
+//        this.prevTerm = prevTerm;
+//        return new SegmentHeader( version, prevIndex, prevTerm );
+//    }
 }

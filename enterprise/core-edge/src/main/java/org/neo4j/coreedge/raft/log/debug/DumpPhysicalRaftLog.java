@@ -28,10 +28,8 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.TreeSet;
 
-import org.neo4j.coreedge.raft.log.RaftLogAppendRecord;
-import org.neo4j.coreedge.raft.log.physical.PhysicalRaftLogFiles;
-import org.neo4j.coreedge.raft.log.physical.SingleVersionReader;
-import org.neo4j.coreedge.raft.log.physical.VersionIndexRanges;
+import org.neo4j.coreedge.raft.log.physical.EntryRecord;
+import org.neo4j.coreedge.raft.log.physical.ToBeRemoved;
 import org.neo4j.coreedge.raft.net.CoreReplicatedContentMarshal;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.state.ChannelMarshal;
@@ -47,179 +45,180 @@ import static org.neo4j.kernel.impl.transaction.log.PhysicalLogFiles.getLogVersi
 import static org.neo4j.kernel.impl.transaction.log.entry.LogHeader.LOG_HEADER_SIZE;
 import static org.neo4j.kernel.impl.transaction.log.entry.LogHeaderReader.readLogHeader;
 
+// TODO
 public class DumpPhysicalRaftLog
 {
-    private final FileSystemAbstraction fileSystem;
-    private static final String TO_FILE = "tofile";
-    private ChannelMarshal<ReplicatedContent> marshal = new CoreReplicatedContentMarshal();
-
-
-    public DumpPhysicalRaftLog( FileSystemAbstraction fileSystem, ChannelMarshal<ReplicatedContent> marshal )
-    {
-        this.fileSystem = fileSystem;
-        this.marshal = marshal;
-    }
-
-    public int dump( String filenameOrDirectory, String logPrefix, PrintStream out ) throws IOException
-    {
-        int logsFound = 0;
-        PhysicalRaftLogFiles files = new PhysicalRaftLogFiles( new File( filenameOrDirectory ), fileSystem, marshal, new VersionIndexRanges() );
-        SingleVersionReader reader = new SingleVersionReader( files, fileSystem, marshal );
-
-        for ( String fileName : filenamesOf( filenameOrDirectory, logPrefix ) )
-        {
-            logsFound++;
-            out.println( "=== " + fileName + " ===" );
-            StoreChannel fileChannel = fileSystem.open( new File( fileName ), "r" );
-
-            LogHeader logHeader;
-            try
-            {
-                logHeader = readLogHeader( ByteBuffer.allocateDirect( LOG_HEADER_SIZE ), fileChannel, false );
-            }
-            catch ( IOException ex )
-            {
-                out.println( "Unable to read timestamp information, no records in logical log." );
-                out.println( ex.getMessage() );
-                fileChannel.close();
-                throw ex;
-            }
-            out.println( "Logical log format:" + logHeader.logFormatVersion + "version: " + logHeader.logVersion +
-                    " with prev committed tx[" + logHeader.lastCommittedTxId + "]" );
-
-            try ( IOCursor<RaftLogAppendRecord> cursor =
-                          reader.readEntriesFrom( new LogPosition( logHeader.logVersion, LogHeader.LOG_HEADER_SIZE ) ) )
-            {
-                while ( cursor.next() )
-                {
-                    out.println( cursor.get().toString() );
-                }
-            }
-        }
-        return logsFound;
-    }
-
-    protected String[] filenamesOf( String filenameOrDirectory, final String prefix )
-    {
-
-        File file = new File( filenameOrDirectory );
-        if ( fileSystem.isDirectory( file ) )
-        {
-            File[] files = fileSystem.listFiles( file, ( dir, name ) -> name.contains( prefix ) && !name.contains( "active" ) );
-            Collection<String> result = new TreeSet<>( sequentialComparator() );
-            for ( File file1 : files )
-            {
-                result.add( file1.getPath() );
-            }
-            return result.toArray( new String[result.size()] );
-        }
-        else
-        {
-            return new String[]{filenameOrDirectory};
-        }
-    }
-
-
-    private static Comparator<? super String> sequentialComparator()
-
-    {
-        return new Comparator<String>()
-        {
-            @Override
-            public int compare( String o1, String o2 )
-            {
-                return versionOf( o1 ).compareTo( versionOf( o2 ) );
-            }
-
-            private Long versionOf( String string )
-            {
-                try
-                {
-                    return getLogVersion( string );
-                }
-                catch ( RuntimeException ignored )
-                {
-                    return Long.MAX_VALUE;
-                }
-            }
-        };
-    }
-
-    public static void main( String args[] ) throws IOException
-    {
-        Args arguments = Args.withFlags( TO_FILE ).parse( args );
-        try ( Printer printer = getPrinter( arguments ) )
-        {
-            for ( String fileAsString : arguments.orphans() )
-            {
-                System.out.println("Reading file " + fileAsString );
-                new DumpPhysicalRaftLog( new DefaultFileSystemAbstraction(), new CoreReplicatedContentMarshal() )
-                        .dump( fileAsString, PhysicalRaftLogFiles.BASE_FILE_NAME, printer.getFor( fileAsString ) );
-            }
-        }
-    }
-
-    public static Printer getPrinter( Args args )
-    {
-        boolean toFile = args.getBoolean( TO_FILE, false, true );
-        return toFile ? new FilePrinter() : SYSTEM_OUT_PRINTER;
-    }
-
-    public interface Printer extends AutoCloseable
-    {
-        PrintStream getFor( String file ) throws FileNotFoundException;
-
-        @Override
-        void close();
-    }
-
-    private static final Printer SYSTEM_OUT_PRINTER = new Printer()
-    {
-        @Override
-        public PrintStream getFor( String file )
-        {
-            return System.out;
-        }
-
-        @Override
-        public void close()
-        {   // Don't close System.out
-        }
-    };
-
-    private static class FilePrinter implements Printer
-    {
-        private File directory;
-        private PrintStream out;
-
-        @Override
-        public PrintStream getFor( String file ) throws FileNotFoundException
-        {
-            File absoluteFile = new File( file ).getAbsoluteFile();
-            File dir = absoluteFile.isDirectory() ? absoluteFile : absoluteFile.getParentFile();
-            if ( !dir.equals( directory ) )
-            {
-                safeClose();
-                File dumpFile = new File( dir, "dump-logical-log.txt" );
-                System.out.println( "Redirecting the output to " + dumpFile.getPath() );
-                out = new PrintStream( dumpFile );
-                directory = dir;
-            }
-            return out;
-        }
-
-        private void safeClose()
-        {
-            if ( out != null )
-            {
-                out.close();
-            }
-        }
-
-        @Override
-        public void close()
-        {
-            safeClose();
-        }
-    }
+//    private final FileSystemAbstraction fileSystem;
+//    private static final String TO_FILE = "tofile";
+//    private ChannelMarshal<ReplicatedContent> marshal = new CoreReplicatedContentMarshal();
+//
+//
+//    public DumpPhysicalRaftLog( FileSystemAbstraction fileSystem, ChannelMarshal<ReplicatedContent> marshal )
+//    {
+//        this.fileSystem = fileSystem;
+//        this.marshal = marshal;
+//    }
+//
+//    public int dump( String filenameOrDirectory, String logPrefix, PrintStream out ) throws IOException
+//    {
+//        int logsFound = 0;
+//        ToBeRemoved files = new ToBeRemoved( new File( filenameOrDirectory ), fileSystem, marshal, new ToBeRemoved3() );
+//        SingleVersionReader reader = new SingleVersionReader( files, fileSystem, marshal );
+//
+//        for ( String fileName : filenamesOf( filenameOrDirectory, logPrefix ) )
+//        {
+//            logsFound++;
+//            out.println( "=== " + fileName + " ===" );
+//            StoreChannel fileChannel = fileSystem.open( new File( fileName ), "r" );
+//
+//            LogHeader logHeader;
+//            try
+//            {
+//                logHeader = readLogHeader( ByteBuffer.allocateDirect( LOG_HEADER_SIZE ), fileChannel, false );
+//            }
+//            catch ( IOException ex )
+//            {
+//                out.println( "Unable to read timestamp information, no records in logical log." );
+//                out.println( ex.getMessage() );
+//                fileChannel.close();
+//                throw ex;
+//            }
+//            out.println( "Logical log format:" + logHeader.logFormatVersion + "version: " + logHeader.logVersion +
+//                    " with prev committed tx[" + logHeader.lastCommittedTxId + "]" );
+//
+//            try ( IOCursor<EntryRecord> cursor =
+//                          reader.readEntriesFrom( new LogPosition( logHeader.logVersion, LogHeader.LOG_HEADER_SIZE ) ) )
+//            {
+//                while ( cursor.next() )
+//                {
+//                    out.println( cursor.get().toString() );
+//                }
+//            }
+//        }
+//        return logsFound;
+//    }
+//
+//    protected String[] filenamesOf( String filenameOrDirectory, final String prefix )
+//    {
+//
+//        File file = new File( filenameOrDirectory );
+//        if ( fileSystem.isDirectory( file ) )
+//        {
+//            File[] files = fileSystem.listFiles( file, ( dir, name ) -> name.contains( prefix ) && !name.contains( "active" ) );
+//            Collection<String> result = new TreeSet<>( sequentialComparator() );
+//            for ( File file1 : files )
+//            {
+//                result.add( file1.getPath() );
+//            }
+//            return result.toArray( new String[result.size()] );
+//        }
+//        else
+//        {
+//            return new String[]{filenameOrDirectory};
+//        }
+//    }
+//
+//
+//    private static Comparator<? super String> sequentialComparator()
+//
+//    {
+//        return new Comparator<String>()
+//        {
+//            @Override
+//            public int compare( String o1, String o2 )
+//            {
+//                return versionOf( o1 ).compareTo( versionOf( o2 ) );
+//            }
+//
+//            private Long versionOf( String string )
+//            {
+//                try
+//                {
+//                    return getLogVersion( string );
+//                }
+//                catch ( RuntimeException ignored )
+//                {
+//                    return Long.MAX_VALUE;
+//                }
+//            }
+//        };
+//    }
+//
+//    public static void main( String args[] ) throws IOException
+//    {
+//        Args arguments = Args.withFlags( TO_FILE ).parse( args );
+//        try ( Printer printer = getPrinter( arguments ) )
+//        {
+//            for ( String fileAsString : arguments.orphans() )
+//            {
+//                System.out.println("Reading file " + fileAsString );
+//                new DumpPhysicalRaftLog( new DefaultFileSystemAbstraction(), new CoreReplicatedContentMarshal() )
+//                        .dump( fileAsString, ToBeRemoved.BASE_FILE_NAME, printer.getFor( fileAsString ) );
+//            }
+//        }
+//    }
+//
+//    public static Printer getPrinter( Args args )
+//    {
+//        boolean toFile = args.getBoolean( TO_FILE, false, true );
+//        return toFile ? new FilePrinter() : SYSTEM_OUT_PRINTER;
+//    }
+//
+//    public interface Printer extends AutoCloseable
+//    {
+//        PrintStream getFor( String file ) throws FileNotFoundException;
+//
+//        @Override
+//        void close();
+//    }
+//
+//    private static final Printer SYSTEM_OUT_PRINTER = new Printer()
+//    {
+//        @Override
+//        public PrintStream getFor( String file )
+//        {
+//            return System.out;
+//        }
+//
+//        @Override
+//        public void close()
+//        {   // Don't close System.out
+//        }
+//    };
+//
+//    private static class FilePrinter implements Printer
+//    {
+//        private File directory;
+//        private PrintStream out;
+//
+//        @Override
+//        public PrintStream getFor( String file ) throws FileNotFoundException
+//        {
+//            File absoluteFile = new File( file ).getAbsoluteFile();
+//            File dir = absoluteFile.isDirectory() ? absoluteFile : absoluteFile.getParentFile();
+//            if ( !dir.equals( directory ) )
+//            {
+//                safeClose();
+//                File dumpFile = new File( dir, "dump-logical-log.txt" );
+//                System.out.println( "Redirecting the output to " + dumpFile.getPath() );
+//                out = new PrintStream( dumpFile );
+//                directory = dir;
+//            }
+//            return out;
+//        }
+//
+//        private void safeClose()
+//        {
+//            if ( out != null )
+//            {
+//                out.close();
+//            }
+//        }
+//
+//        @Override
+//        public void close()
+//        {
+//            safeClose();
+//        }
+//    }
 }

@@ -19,22 +19,18 @@
  */
 package org.neo4j.coreedge.raft.log;
 
-/**
- * Thrown when the RAFT log cannot be read at the supplied index.
- */
-public class RaftLogCompactedException extends Exception
+import org.neo4j.kernel.api.exceptions.KernelException;
+import org.neo4j.kernel.api.exceptions.Status;
+
+public class DamagedLogStorageException extends KernelException
 {
-    public RaftLogCompactedException()
+    public DamagedLogStorageException( String format, Object... args )
     {
+        super( Status.General.StorageDamageDetected, format, args );
     }
 
-    public RaftLogCompactedException( String message )
+    public DamagedLogStorageException( Throwable cause, String format, Object... args )
     {
-        super( message );
-    }
-
-    public RaftLogCompactedException( Exception e )
-    {
-        super( e );
+        super( Status.General.StorageDamageDetected, cause, format, args );
     }
 }

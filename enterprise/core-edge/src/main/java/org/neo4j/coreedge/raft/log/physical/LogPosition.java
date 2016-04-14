@@ -17,24 +17,16 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.coreedge.raft.log;
+package org.neo4j.coreedge.raft.log.physical;
 
-/**
- * Thrown when the RAFT log cannot be read at the supplied index.
- */
-public class RaftLogCompactedException extends Exception
+class LogPosition
 {
-    public RaftLogCompactedException()
-    {
-    }
+    long logIndex;
+    long byteOffset;
 
-    public RaftLogCompactedException( String message )
+    LogPosition( long logIndex, long byteOffset )
     {
-        super( message );
-    }
-
-    public RaftLogCompactedException( Exception e )
-    {
-        super( e );
+        this.logIndex = logIndex;
+        this.byteOffset = byteOffset;
     }
 }

@@ -17,24 +17,24 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.coreedge.raft.log;
+package org.neo4j.coreedge.raft.log.physical;
 
-/**
- * Thrown when the RAFT log cannot be read at the supplied index.
- */
-public class RaftLogCompactedException extends Exception
+import org.junit.Ignore;
+import org.junit.Test;
+
+import static org.junit.Assert.*;
+
+// TODO
+public class TermCacheTest
 {
-    public RaftLogCompactedException()
+    @Ignore
+    public void shouldWriteATest() throws Exception
     {
-    }
+        // given
+        fail("No tests written.");
 
-    public RaftLogCompactedException( String message )
-    {
-        super( message );
-    }
+        // when
 
-    public RaftLogCompactedException( Exception e )
-    {
-        super( e );
+        // then
     }
 }

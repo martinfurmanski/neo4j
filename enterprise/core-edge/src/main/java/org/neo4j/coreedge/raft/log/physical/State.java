@@ -17,24 +17,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.coreedge.raft.log;
+package org.neo4j.coreedge.raft.log.physical;
 
 /**
- * Thrown when the RAFT log cannot be read at the supplied index.
+ * Collects all the state that must be recovered after a restart.
  */
-public class RaftLogCompactedException extends Exception
+public class State
 {
-    public RaftLogCompactedException()
-    {
-    }
+    Segments segments;
 
-    public RaftLogCompactedException( String message )
-    {
-        super( message );
-    }
+    long prevIndex = -1;
+    long prevTerm = -1;
+    long appendIndex = -1;
+    long currentTerm = -1;
 
-    public RaftLogCompactedException( Exception e )
+    @Override
+    public String toString()
     {
-        super( e );
+        return "State{" +
+               "segments=" + segments +
+               ", prevIndex=" + prevIndex +
+               ", prevTerm=" + prevTerm +
+               ", appendIndex=" + appendIndex +
+               ", currentTerm=" + currentTerm +
+               '}';
     }
 }

@@ -31,29 +31,29 @@ import static org.mockito.Mockito.when;
 
 public class FilenameBasedLogVersionRepositoryTest
 {
-    @Rule
-    public TargetDirectory.TestDirectory testDir;
-
-    @Test
-    public void shouldStartAtVersion0() throws Exception
-    {
-        PhysicalLogFiles logFiles = mock( PhysicalLogFiles.class );
-        when( logFiles.getHighestLogVersion() ).thenReturn( -1L );
-
-        FilenameBasedLogVersionRepository repository = new FilenameBasedLogVersionRepository( logFiles );
-
-        assertEquals( 0L, repository.getCurrentLogVersion() );
-    }
-
-    @Test
-    public void shouldPickHighestVersionAvailable() throws Exception
-    {
-        PhysicalLogFiles logFiles = mock( PhysicalLogFiles.class );
-        when( logFiles.getHighestLogVersion() ).thenReturn( 2L );
-
-        FilenameBasedLogVersionRepository repository = new FilenameBasedLogVersionRepository( logFiles );
-
-        assertEquals( 2L, repository.getCurrentLogVersion() );
-
-    }
+//    @Rule
+//    public TargetDirectory.TestDirectory testDir;
+//
+//    @Test
+//    public void shouldStartAtVersion0() throws Exception
+//    {
+//        PhysicalLogFiles logFiles = mock( PhysicalLogFiles.class );
+//        when( logFiles.getHighestLogVersion() ).thenReturn( -1L );
+//
+//        FilenameBasedLogVersionRepository repository = new FilenameBasedLogVersionRepository( logFiles );
+//
+//        assertEquals( 0L, repository.getCurrentLogVersion() );
+//    }
+//
+//    @Test
+//    public void shouldPickHighestVersionAvailable() throws Exception
+//    {
+//        PhysicalLogFiles logFiles = mock( PhysicalLogFiles.class );
+//        when( logFiles.getHighestLogVersion() ).thenReturn( 2L );
+//
+//        FilenameBasedLogVersionRepository repository = new FilenameBasedLogVersionRepository( logFiles );
+//
+//        assertEquals( 2L, repository.getCurrentLogVersion() );
+//
+//    }
 }

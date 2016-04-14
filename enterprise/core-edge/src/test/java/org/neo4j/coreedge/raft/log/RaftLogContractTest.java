@@ -23,12 +23,12 @@ import org.junit.Test;
 
 import org.neo4j.coreedge.raft.ReplicatedString;
 
-import static jdk.nashorn.internal.runtime.regexp.joni.Config.log;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 import static org.neo4j.coreedge.raft.ReplicatedInteger.valueOf;
 import static org.neo4j.coreedge.raft.log.RaftLogHelper.hasNoContent;
@@ -71,7 +71,7 @@ public abstract class RaftLogContractTest
     }
 
     @Test
-    public void shouldAppendDataAndNotCommitImmediately() throws Exception
+    public void shouldAppendData() throws Exception
     {
         RaftLog log = createRaftLog();
 
@@ -105,11 +105,11 @@ public abstract class RaftLogContractTest
     {
         RaftLog log = createRaftLog();
 
-        RaftLogEntry logEntryA = new RaftLogEntry( 1, valueOf( 1 ) );
-        RaftLogEntry logEntryB = new RaftLogEntry( 1, valueOf( 2 ) );
-        RaftLogEntry logEntryC = new RaftLogEntry( 1, valueOf( 3 ) );
-        RaftLogEntry logEntryD = new RaftLogEntry( 1, valueOf( 4 ) );
-        RaftLogEntry logEntryE = new RaftLogEntry( 1, valueOf( 5 ) );
+        RaftLogEntry logEntryA = new RaftLogEntry( 1, valueOf( 0 ) );
+        RaftLogEntry logEntryB = new RaftLogEntry( 1, valueOf( 1 ) );
+        RaftLogEntry logEntryC = new RaftLogEntry( 1, valueOf( 2 ) );
+        RaftLogEntry logEntryD = new RaftLogEntry( 1, valueOf( 3 ) );
+        RaftLogEntry logEntryE = new RaftLogEntry( 1, valueOf( 4 ) );
 
         log.append( logEntryA );
         log.append( logEntryB );
@@ -229,7 +229,7 @@ public abstract class RaftLogContractTest
         long prunedIndex = -1;
 
         // this loop should eventually be able to prune something
-        while ( prunedIndex == -1 )
+        while ( prunedIndex == -1 && log.appendIndex() < 1000 )
         {
             for ( int i = 0; i < 100; i++ )
             {
@@ -242,6 +242,7 @@ public abstract class RaftLogContractTest
         }
 
         // then
+        assertNotEquals( -1L, prunedIndex );
         assertThat( prunedIndex, lessThanOrEqualTo( safeIndex ) );
         assertEquals( prunedIndex, log.prevIndex() );
         assertEquals( prunedIndex, log.readEntryTerm( prunedIndex ) );

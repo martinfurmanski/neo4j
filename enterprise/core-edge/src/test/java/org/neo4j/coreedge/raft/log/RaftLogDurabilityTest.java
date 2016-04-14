@@ -32,18 +32,16 @@ import java.util.Collection;
 
 import org.neo4j.coreedge.raft.ReplicatedInteger;
 import org.neo4j.coreedge.raft.ReplicatedString;
-import org.neo4j.coreedge.raft.log.physical.PhysicalRaftLogFile;
+import org.neo4j.coreedge.raft.log.physical.PhysicalRaftLog;
 import org.neo4j.coreedge.server.core.EnterpriseCoreEditionModule.RaftLogImplementation;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.kernel.internal.DatabaseHealth;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.rule.fs.EphemeralFileSystemRule;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.neo4j.coreedge.raft.ReplicatedInteger.valueOf;
 import static org.neo4j.coreedge.raft.log.RaftLogHelper.hasNoContent;
 import static org.neo4j.coreedge.raft.log.RaftLogHelper.readLogEntry;
@@ -79,15 +77,9 @@ public class RaftLogDurabilityTest
 
             long rotateAtSizeBytes = 128;
             int entryCacheSize = 4;
-            int metadataCacheSize = 8;
-            int fileHeaderCacheSize = 2;
 
-            PhysicalRaftLog log = new PhysicalRaftLog( fileSystem, directory, rotateAtSizeBytes, "1 files",
-                    entryCacheSize, fileHeaderCacheSize,
-                    new PhysicalRaftLogFile.Monitor.Adapter(), new DummyRaftableContentSerializer(), () -> mock(
-                    DatabaseHealth.class ),
-                    NullLogProvider.getInstance(), new RaftLogMetadataCache( metadataCacheSize ) );
-            log.init();
+            PhysicalRaftLog log = new PhysicalRaftLog( fileSystem, directory, rotateAtSizeBytes,
+                    new DummyRaftableContentSerializer(), NullLogProvider.getInstance(), entryCacheSize );
             log.start();
             return log;
         };
@@ -113,7 +105,7 @@ public class RaftLogDurabilityTest
     }
 
     @Test
-    public void shouldAppendAndCommit() throws Exception
+    public void shouldAppendAndRecover() throws Exception
     {
         RaftLog log = logFactory.createBasedOn( fsRule.get() );
 

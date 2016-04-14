@@ -51,10 +51,8 @@ import org.neo4j.coreedge.raft.RaftStateMachine;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
 import org.neo4j.coreedge.raft.log.MonitoredRaftLog;
 import org.neo4j.coreedge.raft.log.NaiveDurableRaftLog;
-import org.neo4j.coreedge.raft.log.PhysicalRaftLog;
+import org.neo4j.coreedge.raft.log.physical.PhysicalRaftLog;
 import org.neo4j.coreedge.raft.log.RaftLog;
-import org.neo4j.coreedge.raft.log.RaftLogMetadataCache;
-import org.neo4j.coreedge.raft.log.physical.PhysicalRaftLogFile;
 import org.neo4j.coreedge.raft.membership.CoreMemberSetBuilder;
 import org.neo4j.coreedge.raft.membership.MembershipWaiter;
 import org.neo4j.coreedge.raft.membership.RaftMembershipManager;
@@ -512,7 +510,7 @@ public class EnterpriseCoreEditionModule
 
     private RaftLog createRaftLog(
             Config config, LifeSupport life, FileSystemAbstraction fileSystem, File clusterStateDirectory,
-            CoreReplicatedContentMarshal marshal, LogProvider logProvider,
+            CoreReplicatedContentMarshal contentMarshal, LogProvider logProvider,
             Supplier<DatabaseHealth> databaseHealthSupplier )
     {
         RaftLogImplementation raftLogImplementation = RaftLogImplementation.fromString(
@@ -522,23 +520,18 @@ public class EnterpriseCoreEditionModule
             case IN_MEMORY:
                 return new InMemoryRaftLog();
             case PHYSICAL:
-                long rotateAtSize = config.get( CoreEdgeClusterSettings.raft_log_rotation_size );
-                String pruneConf = config.get( CoreEdgeClusterSettings.raft_log_pruning );
                 int entryCacheSize = config.get( CoreEdgeClusterSettings.raft_log_entry_cache_size );
-                int metaDataCacheSize = config.get( CoreEdgeClusterSettings.raft_log_meta_data_cache_size );
-                int headerCacheSize = config.get( CoreEdgeClusterSettings.raft_log_header_cache_size );
+                long rotationSize = config.get( CoreEdgeClusterSettings.raft_log_rotation_size );
+                File logDirectory = new File( clusterStateDirectory, "raft-log" );
 
                 return life.add( new PhysicalRaftLog(
-                        fileSystem,
-                        new File( clusterStateDirectory, PhysicalRaftLog.DIRECTORY_NAME ),
-                        rotateAtSize, pruneConf, entryCacheSize, headerCacheSize,
-                        new PhysicalRaftLogFile.Monitor.Adapter(), marshal, databaseHealthSupplier, logProvider, new RaftLogMetadataCache( metaDataCacheSize ) ) );
+                        fileSystem, logDirectory, rotationSize, contentMarshal, logProvider, entryCacheSize ) );
             case NAIVE:
             default:
                 return life.add( new NaiveDurableRaftLog(
                         fileSystem,
                         new File( clusterStateDirectory, NaiveDurableRaftLog.DIRECTORY_NAME ),
-                        marshal, logProvider ) );
+                        contentMarshal, logProvider ) );
         }
     }
 
