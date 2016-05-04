@@ -250,6 +250,14 @@ class SegmentFile
         }
     }
 
+    /*
+    raft.log.9 -> [70, 99] [69, term]
+    rag.log.10 -> [100, 110]
+    -> truncate( 98 )
+    -> delete (raft.log.10)
+    -> create (raft.log.11) [98..[
+     */
+
     boolean isDisposed()
     {
         return isDisposed;

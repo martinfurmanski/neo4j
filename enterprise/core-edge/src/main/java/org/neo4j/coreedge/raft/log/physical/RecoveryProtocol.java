@@ -116,7 +116,8 @@ class RecoveryProtocol
         state.appendIndex = last.header().prevIndex();
         state.currentTerm = last.header().prevTerm();
 
-        try ( IOCursor<EntryRecord> reader = last.getReader( last.header().prevIndex() + 1 ) )
+        long firstIndexInLastSegmentFile = last.header().prevIndex() + 1;
+        try ( IOCursor<EntryRecord> reader =  last.getReader( firstIndexInLastSegmentFile ) )
         {
             while ( reader.next() )
             {

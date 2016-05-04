@@ -30,10 +30,11 @@ import org.neo4j.logging.Log;
 
 class FileNames
 {
+    public static final String BASE_FILE_NAME = "raft.log.";
+
     private final File baseDirectory;
     private final Pattern logFilePattern;
 
-    private static final String BASE_FILE_NAME = "raft.log.";
     private static final String VERSION_MATCH = "(0|[1-9]\\d*)";
 
     FileNames( File baseDirectory )
