@@ -22,7 +22,6 @@ package org.neo4j.coreedge.raft.log.physical;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -33,21 +32,28 @@ import org.neo4j.coreedge.raft.state.ChannelMarshal;
 import org.neo4j.coreedge.raft.state.UnexpectedEndOfStreamException;
 import org.neo4j.cursor.IOCursor;
 import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.io.fs.StoreChannel;
+import org.neo4j.kernel.impl.transaction.log.PhysicalFlushableChannel;
+import org.neo4j.kernel.impl.transaction.log.ReadAheadChannel;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Recovers all the state required for operating the RAFT log and does some simple
  * verifications; e.g. checking for gaps, verifying headers.
  */
-// TODO: Verify headers, check for gaps in version numbers, ...
 class RecoveryProtocol
 {
+    private static final SegmentHeader.Marshal headerMarshal = new SegmentHeader.Marshal();
+
     private final FileSystemAbstraction fileSystem;
     private final FileNames fileNames;
     private final ChannelMarshal<ReplicatedContent> contentMarshal;
     private final LogProvider logProvider;
     private final Log log;
+    private long expectedVersion;
 
     RecoveryProtocol( FileSystemAbstraction fileSystem, FileNames fileNames,
             ChannelMarshal<ReplicatedContent> contentMarshal, LogProvider logProvider )
@@ -66,42 +72,52 @@ class RecoveryProtocol
 
         if ( files.entrySet().isEmpty() )
         {
-            state.segments = new Segments( fileSystem, fileNames, Collections.emptyList(), contentMarshal, logProvider, -1 );
+            state.segments = new Segments( fileSystem, fileNames, emptyList(), contentMarshal, logProvider, -1 );
             state.segments.createNext( -1, -1, -1 );
             return state;
         }
 
         List<SegmentFile> segmentFiles = new ArrayList<>();
         long firstVersion = files.firstKey();
+        expectedVersion = firstVersion;
 
         for ( Map.Entry<Long,File> entry : files.entrySet() )
         {
             try
             {
-                Long version = entry.getKey();
+                long fileNameVersion = entry.getKey();
                 File file = entry.getValue();
 
-                SegmentFile segment;
+                SegmentHeader header;
                 try
                 {
-                    segment = SegmentFile.load( fileSystem, file, contentMarshal, logProvider );
+                    header = loadHeader( fileSystem, file );
                 }
                 catch ( UnexpectedEndOfStreamException e )
                 {
-                    // TODO Handle
-                    throw new RuntimeException( e );
+                    if ( files.lastKey() != fileNameVersion )
+                    {
+                        throw new DamagedLogStorageException( e, "File with incomplete or no header found: %s", file );
+                    }
+
+                    header = new SegmentHeader( state.appendIndex, fileNameVersion, state.appendIndex, state.currentTerm );
+                    writeHeader( fileSystem, file, header );
                 }
+
+                SegmentFile segment = new SegmentFile( fileSystem, file, contentMarshal, logProvider, header );
+
+                checkVersionStrictlyMonotonic( fileNameVersion );
+                checkVersionMatches( segment.header().version(), fileNameVersion );
 
                 segmentFiles.add( segment );
 
-                if ( version == firstVersion )
+                if ( fileNameVersion == firstVersion )
                 {
                     state.prevIndex = segment.header().prevIndex();
                     state.prevTerm = segment.header().prevTerm();
                 }
 
-                // checkVersionStrictlyMonotonic( fileNameVersion, state );
-                // checkVersionMatches( fileNameVersion, header.version() );
+                expectedVersion++;
                 // check term
             }
             catch ( IOException e )
@@ -134,13 +150,44 @@ class RecoveryProtocol
         return state;
     }
 
-    private void checkVersionStrictlyMonotonic( long fileNameVersion, State state )
+    private static SegmentHeader loadHeader(
+            FileSystemAbstraction fileSystem,
+            File file ) throws IOException, UnexpectedEndOfStreamException
     {
-        // TODO
+        try ( StoreChannel channel = fileSystem.open( file, "r" ) )
+        {
+            return headerMarshal.unmarshal( new ReadAheadChannel<>( channel, SegmentHeader.SIZE ) );
+        }
     }
 
-    private void checkVersionMatches( long expectedVersion, long headerVersion )
+    private static void writeHeader(
+            FileSystemAbstraction fileSystem,
+            File file,
+            SegmentHeader header ) throws IOException
     {
-        // TODO
+        try ( StoreChannel channel = fileSystem.open( file, "rw" ) )
+        {
+            channel.position( 0 );
+            PhysicalFlushableChannel writer = new PhysicalFlushableChannel( channel, SegmentHeader.SIZE );
+            headerMarshal.marshal( header, writer );
+            writer.prepareForFlush().flush();
+        }
+    }
+
+    private void checkVersionStrictlyMonotonic( long fileNameVersion ) throws DamagedLogStorageException
+    {
+        if ( fileNameVersion != expectedVersion )
+        {
+            throw new DamagedLogStorageException( "File versions not strictly monotonic. Expected: %d but found: %d", expectedVersion, fileNameVersion );
+        }
+
+    }
+
+    private void checkVersionMatches( long headerVersion, long fileNameVersion ) throws DamagedLogStorageException
+    {
+        if ( headerVersion != fileNameVersion )
+        {
+            throw new DamagedLogStorageException( "File version does not match header version. Expected: %d but found: %d", headerVersion, fileNameVersion );
+        }
     }
 }

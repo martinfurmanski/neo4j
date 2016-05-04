@@ -22,6 +22,7 @@ package org.neo4j.coreedge.raft.log;
 import org.neo4j.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.api.exceptions.Status;
 
+// TODO: Should this really be a KernelException?
 public class DamagedLogStorageException extends KernelException
 {
     public DamagedLogStorageException( String format, Object... args )

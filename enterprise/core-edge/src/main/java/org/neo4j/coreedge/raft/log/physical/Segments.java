@@ -35,6 +35,9 @@ import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 
+/**
+ * Keeps track of all the segments that the RAFT log consists of.
+ */
 class Segments
 {
     private final OpenEndRangeMap<Long/*minIndex*/,SegmentFile> rangeMap = new OpenEndRangeMap<>();

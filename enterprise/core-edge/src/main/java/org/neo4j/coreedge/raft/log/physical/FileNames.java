@@ -28,26 +28,57 @@ import java.util.regex.Pattern;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.logging.Log;
 
+/**
+ * Deals with file names for the RAFT log. The files are named as
+ *
+ *   raft.log.0
+ *   raft.log.1
+ *   ...
+ *   raft.log.23
+ *   ...
+ *
+ * where the suffix represents the version, which is a strictly monotonic sequence.
+ */
 class FileNames
 {
-    public static final String BASE_FILE_NAME = "raft.log.";
+    static final String BASE_FILE_NAME = "raft.log.";
+    private static final String VERSION_MATCH = "(0|[1-9]\\d*)";
 
     private final File baseDirectory;
     private final Pattern logFilePattern;
 
-    private static final String VERSION_MATCH = "(0|[1-9]\\d*)";
-
+    /**
+     * Creates an object useful for managing RAFT log file names.
+     *
+     * @param baseDirectory The base directory in which the RAFT log files reside.
+     */
     FileNames( File baseDirectory )
     {
         this.baseDirectory = baseDirectory;
         this.logFilePattern = Pattern.compile( BASE_FILE_NAME + VERSION_MATCH );
     }
 
+    /**
+     * Creates a file object for the specific version.
+     *
+     * @param version The version.
+     *
+     * @return A file for the specific version.
+     */
     File getForVersion( long version )
     {
         return new File( baseDirectory, BASE_FILE_NAME + version );
     }
 
+    /**
+     * Looks in the base directory for all suitable RAFT log files and returns a sorted map
+     * with the version as key and File as value.
+     *
+     * @param fileSystem The filesystem.
+     * @param log The message log.
+     *
+     * @return The sorted version to file map.
+     */
     SortedMap<Long,File> getAllFiles( FileSystemAbstraction fileSystem, Log log )
     {
         SortedMap<Long,File> versionFileMap = new TreeMap<>();

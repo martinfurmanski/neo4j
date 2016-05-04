@@ -31,6 +31,9 @@ import org.neo4j.kernel.impl.transaction.log.ReadAheadChannel;
 
 import static org.neo4j.coreedge.raft.log.physical.EntryRecord.read;
 
+/**
+ * A cursor for iterating over RAFT log entries in a segment.
+ */
 class EntryRecordCursor implements IOCursor<EntryRecord>
 {
     private final ReadAheadChannel<StoreChannel> reader;

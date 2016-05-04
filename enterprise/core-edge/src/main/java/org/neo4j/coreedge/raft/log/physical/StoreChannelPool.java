@@ -32,7 +32,7 @@ import org.neo4j.logging.LogProvider;
 /**
  * Keeps a pool of store channels available.
  */
-public class StoreChannelPool
+class StoreChannelPool
 {
     private final FileSystemAbstraction fsa;
     private final File file;

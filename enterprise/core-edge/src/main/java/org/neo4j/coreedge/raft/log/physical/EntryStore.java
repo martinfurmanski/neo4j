@@ -26,6 +26,11 @@ import org.neo4j.coreedge.raft.log.physical.OpenEndRangeMap.ValueRange;
 import org.neo4j.cursor.CursorValue;
 import org.neo4j.cursor.IOCursor;
 
+/**
+ * The entrie store allows iterating over RAFT log entries efficiently and handles moving from one
+ * segment to the next in a transparent manner. It can thus be mainly viewed as a factory for a
+ * smart segment-crossing cursor.
+ */
 class EntryStore
 {
     private Segments segments;

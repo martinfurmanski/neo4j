@@ -28,6 +28,9 @@ import org.neo4j.storageengine.api.ReadPastEndException;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
+/**
+ * A log entry and it's log index.
+ */
 public class EntryRecord
 {
     private final long logIndex;

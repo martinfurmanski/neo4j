@@ -25,7 +25,6 @@ import java.io.IOException;
 import org.neo4j.coreedge.raft.log.RaftLogEntry;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
 import org.neo4j.coreedge.raft.state.ChannelMarshal;
-import org.neo4j.coreedge.raft.state.UnexpectedEndOfStreamException;
 import org.neo4j.cursor.IOCursor;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.fs.StoreChannel;
@@ -64,7 +63,7 @@ class SegmentFile
     private Runnable onDisposal;
     private volatile boolean isDisposed;
 
-    private SegmentFile(
+    SegmentFile(
             FileSystemAbstraction fileSystem,
             File file,
             ChannelMarshal<ReplicatedContent> contentMarshal,
@@ -96,17 +95,6 @@ class SegmentFile
 
         headerMarshal.marshal( header, segment.getOrCreateWriter() );
         return segment;
-    }
-
-    static SegmentFile load(
-            FileSystemAbstraction fileSystem,
-            File file,
-            ChannelMarshal<ReplicatedContent> contentMarshal,
-            LogProvider logProvider ) throws IOException, UnexpectedEndOfStreamException
-    {
-        StoreChannel channel = fileSystem.open( file, "r" );
-        SegmentHeader header = headerMarshal.unmarshal( new ReadAheadChannel<>( channel, SegmentHeader.SIZE ) );
-        return new SegmentFile( fileSystem, file, contentMarshal, logProvider, header );
     }
 
     /**

@@ -27,6 +27,9 @@ import org.neo4j.storageengine.api.ReadPastEndException;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
+/**
+ * The header written at the beginning of each segment.
+ */
 class SegmentHeader
 {
     static final int SIZE = 4 * Long.BYTES;
