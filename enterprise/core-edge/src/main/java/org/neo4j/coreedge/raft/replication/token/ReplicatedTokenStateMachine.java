@@ -21,13 +21,12 @@ package org.neo4j.coreedge.raft.replication.token;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.neo4j.coreedge.raft.state.Result;
 import org.neo4j.coreedge.raft.state.StateMachine;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
-import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
 import org.neo4j.kernel.impl.locking.LockGroup;
 import org.neo4j.kernel.impl.store.record.TokenRecord;
@@ -69,11 +68,11 @@ public class ReplicatedTokenStateMachine<TOKEN extends Token> implements StateMa
     }
 
     @Override
-    public synchronized Optional<Result> applyCommand( ReplicatedTokenRequest tokenRequest, long commandIndex )
+    public synchronized void applyCommand( ReplicatedTokenRequest tokenRequest, long commandIndex, Consumer<Result> consumer )
     {
         if ( commandIndex <= lastCommittedIndex )
         {
-            return Optional.empty();
+            return;
         }
 
         Integer tokenId = tokenRegistry.getId( tokenRequest.tokenName() );
@@ -93,7 +92,7 @@ public class ReplicatedTokenStateMachine<TOKEN extends Token> implements StateMa
             tokenRegistry.addToken( tokenFactory.newToken( tokenRequest.tokenName(), tokenId ) );
         }
 
-        return Optional.of( Result.of( tokenId ) );
+        consumer.accept( Result.of( tokenId ) );
     }
 
     private int applyToStore( Collection<StorageCommand> commands, long logIndex ) throws NoSuchEntryException

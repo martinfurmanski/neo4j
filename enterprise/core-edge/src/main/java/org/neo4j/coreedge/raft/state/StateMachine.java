@@ -20,7 +20,7 @@
 package org.neo4j.coreedge.raft.state;
 
 import java.io.IOException;
-import java.util.Optional;
+import java.util.function.Consumer;
 
 public interface StateMachine<Command>
 {
@@ -30,7 +30,7 @@ public interface StateMachine<Command>
      *  @param command Command to the state machine.
      * @param commandIndex The index of the command.
      */
-    Optional<Result> applyCommand( Command command, long commandIndex );
+    void applyCommand( Command command, long commandIndex, Consumer<Result> consumer );
 
     /**
      * Flushes state to durable storage.

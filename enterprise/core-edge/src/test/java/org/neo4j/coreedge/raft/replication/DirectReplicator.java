@@ -39,17 +39,18 @@ public class DirectReplicator<Command> implements Replicator
     @Override
     public synchronized Future<Object> replicate( ReplicatedContent content, boolean trackResult )
     {
-        Optional<Result> result = stateMachine.applyCommand( (Command) content, commandIndex++ );
+//        Optional<Result> result = stateMachine.applyCommand( (Command) content, commandIndex++ );
 
         CompletableFuture<Object> futureResult = new CompletableFuture<>();
-        if( trackResult )
-        {
-            assert result.isPresent();
-            return result.get().apply( futureResult );
-        }
-        else
-        {
-            return futureResult;
-        }
+//        if( trackResult )
+//        {
+//            assert result.isPresent();
+//            return result.get().apply( futureResult );
+//        }
+//        else
+//        {
+//            return futureResult;
+//        }
+        return futureResult;
     }
 }

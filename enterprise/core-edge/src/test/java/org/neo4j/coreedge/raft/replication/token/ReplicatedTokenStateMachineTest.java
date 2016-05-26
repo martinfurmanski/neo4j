@@ -67,7 +67,7 @@ public class ReplicatedTokenStateMachineTest
 
         // when
         stateMachine.applyCommand( new ReplicatedTokenRequest( LABEL, "Person",
-                commandBytes( tokenCommands( EXPECTED_TOKEN_ID ) ) ), 1 );
+                commandBytes( tokenCommands( EXPECTED_TOKEN_ID ) ) ), 1, result -> {} );
 
         // then
         assertEquals( EXPECTED_TOKEN_ID, (int) registry.getId( "Person" ) );
@@ -89,8 +89,8 @@ public class ReplicatedTokenStateMachineTest
                 new ReplicatedTokenRequest( LABEL, "Person", commandBytes( tokenCommands( UNEXPECTED_TOKEN_ID ) ) );
 
         // when
-        stateMachine.applyCommand( winningRequest, 1 );
-        stateMachine.applyCommand( losingRequest, 2 );
+        stateMachine.applyCommand( winningRequest, 1, result -> {} );
+        stateMachine.applyCommand( losingRequest, 2, result -> {} );
 
         // then
         assertEquals( EXPECTED_TOKEN_ID, (int) registry.getId( "Person" ) );
@@ -111,7 +111,7 @@ public class ReplicatedTokenStateMachineTest
         // when
         ReplicatedTokenRequest tokenRequest = new ReplicatedTokenRequest( LABEL, "Person",
                 commandBytes( tokenCommands( EXPECTED_TOKEN_ID ) ) );
-        stateMachine.applyCommand( tokenRequest, logIndex );
+        stateMachine.applyCommand( tokenRequest, logIndex, result -> {} );
 
         // then
         List<TransactionRepresentation> transactions = commitProcess.transactionsToApply;

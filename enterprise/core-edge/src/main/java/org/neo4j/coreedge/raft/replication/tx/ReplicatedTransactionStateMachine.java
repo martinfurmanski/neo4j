@@ -20,7 +20,11 @@
 package org.neo4j.coreedge.raft.replication.tx;
 
 import java.io.IOException;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.function.Consumer;
 
 import org.neo4j.coreedge.raft.state.Result;
 import org.neo4j.coreedge.raft.state.StateMachine;
@@ -35,6 +39,7 @@ import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.storageengine.api.TransactionApplicationMode;
 
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.neo4j.coreedge.raft.replication.tx.LogIndexTxHeaderEncoding.encodeLogIndexAsTxHeader;
 import static org.neo4j.kernel.api.exceptions.Status.Transaction.LockSessionExpired;
 
@@ -51,6 +56,8 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
     {
         this.lockTokenStateMachine = lockStateMachine;
         this.log = logProvider.getLog( getClass() );
+
+        new Thread( ReplicatedTransactionStateMachine.this::batchCommitProcess ).start();
     }
 
     public synchronized void installCommitProcess( TransactionCommitProcess commitProcess, long lastCommittedIndex )
@@ -65,13 +72,88 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
         // implicity flushed
     }
 
+    class TxContext
+    {
+        private Consumer<Result> consumer;
+        private TransactionRepresentation tx;
+
+        TxContext( Consumer<Result> consumer, TransactionRepresentation tx )
+        {
+            this.consumer = consumer;
+            this.tx = tx;
+        }
+    }
+
+    private BlockingQueue<TxContext> txQ = new ArrayBlockingQueue<>( 1024 );
+
+    private int MAX_BATCH = 64;
+    private List<TxContext> contextList = new ArrayList<>( MAX_BATCH );
+    private boolean isRunning = true;
+
+    private void batchCommitProcess()
+    {
+        while ( isRunning )
+        {
+            TxContext firstContext = null;
+            try
+            {
+                firstContext = txQ.poll( 1, MINUTES );
+            }
+            catch ( InterruptedException e )
+            {
+                // ignored
+            }
+
+            if ( firstContext != null )
+            {
+                contextList.add( firstContext );
+                txQ.drainTo( contextList, MAX_BATCH - 1 );
+
+                TransactionToApply first = null;
+                TransactionToApply last = null;
+
+                for ( TxContext context : contextList )
+                {
+                    if( first == null )
+                    {
+                        first = last = new TransactionToApply( context.tx );
+                    }
+                    else
+                    {
+                        TransactionToApply next = new TransactionToApply( context.tx );
+                        last.next( next );
+                        last = next;
+                    }
+                }
+
+                long txId = -1;
+                try
+                {
+                    txId = commitProcess.commit( first, CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );
+                }
+                catch ( TransactionFailureException e )
+                {
+                    e.printStackTrace();
+                }
+
+                Result result = Result.of( txId );
+                for ( TxContext aTx : contextList )
+                {
+                    aTx.consumer.accept( result );
+                }
+
+                contextList.clear();
+            }
+        }
+    }
+
     @Override
-    public synchronized Optional<Result> applyCommand( ReplicatedTransaction replicatedTx, long commandIndex )
+    public synchronized void applyCommand( ReplicatedTransaction replicatedTx, long commandIndex, Consumer<Result> consumer )
     {
         if ( commandIndex <= lastCommittedIndex )
         {
             log.debug( "Ignoring transaction at log index %d since already committed up to %d", commandIndex, lastCommittedIndex );
-            return Optional.empty();
+            return;
         }
 
         TransactionRepresentation tx;
@@ -84,21 +166,12 @@ public class ReplicatedTransactionStateMachine<MEMBER> implements StateMachine<R
 
         if ( currentTokenId != txLockSessionId && txLockSessionId != Locks.Client.NO_LOCK_SESSION_ID )
         {
-            return Optional.of( Result.of( new TransactionFailureException(
+            consumer.accept( Result.of( new TransactionFailureException(
                     LockSessionExpired, "The lock session in the cluster has changed: [current lock session id:%d, tx lock session id:%d]",
                     currentTokenId, txLockSessionId ) ) );
+            return;
         }
 
-        try
-        {
-            long txId = commitProcess.commit( new TransactionToApply( tx ), CommitEvent.NULL, TransactionApplicationMode.EXTERNAL );
-            return Optional.of( Result.of( txId ) );
-        }
-        catch ( TransactionFailureException e )
-        {
-            throw new IllegalStateException( "Failed to locally commit a transaction that has already been " +
-                                             "committed to the RAFT log. This server cannot process later transactions and needs to be " +
-                                             "restarted once the underlying cause has been addressed.", e );
-        }
+        txQ.offer( new TxContext( consumer, tx ) );
     }
 }

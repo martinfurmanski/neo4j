@@ -21,6 +21,7 @@ package org.neo4j.coreedge.server.core.locks;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.neo4j.coreedge.raft.state.Result;
 import org.neo4j.coreedge.raft.state.StateMachine;
@@ -42,21 +43,21 @@ public class ReplicatedLockTokenStateMachine<MEMBER> implements StateMachine<Rep
     }
 
     @Override
-    public synchronized Optional<Result> applyCommand( ReplicatedLockTokenRequest<MEMBER> tokenRequest, long commandIndex )
+    public synchronized void applyCommand( ReplicatedLockTokenRequest<MEMBER> tokenRequest, long commandIndex, Consumer<Result> consumer )
     {
         if( commandIndex <= state.ordinal() )
         {
-            return Optional.empty();
+            return;
         }
 
         if ( tokenRequest.id() == LockToken.nextCandidateId( currentToken().id() ) )
         {
             state.set( tokenRequest, commandIndex );
-            return Optional.of( Result.of( true ) );
+            consumer.accept( Result.of( true ) );
         }
         else
         {
-            return Optional.of( Result.of( false ) );
+            consumer.accept( Result.of( false ) );
         }
     }
 

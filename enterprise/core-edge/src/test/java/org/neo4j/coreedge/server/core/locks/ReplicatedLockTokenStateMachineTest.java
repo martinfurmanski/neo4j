@@ -22,6 +22,7 @@ package org.neo4j.coreedge.server.core.locks;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import org.neo4j.coreedge.raft.state.DurableStateStorage;
@@ -64,7 +65,7 @@ public class ReplicatedLockTokenStateMachineTest
         int firstCandidateId = LockToken.nextCandidateId( stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 0 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 0, result -> {} );
 
         // then
         assertEquals( firstCandidateId + 1, LockToken.nextCandidateId( stateMachine.currentToken().id() ) );
@@ -79,13 +80,13 @@ public class ReplicatedLockTokenStateMachineTest
         int firstCandidateId = LockToken.nextCandidateId( stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1, result -> {} );
 
         // then
         assertEquals( firstCandidateId, stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 2 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 2, result -> {} );
 
         // then
         assertEquals( firstCandidateId + 1, stateMachine.currentToken().id() );
@@ -100,13 +101,13 @@ public class ReplicatedLockTokenStateMachineTest
         int firstCandidateId = LockToken.nextCandidateId( stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1, result -> {} );
 
         // then
         assertEquals( member( 0 ), stateMachine.currentToken().owner() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId + 1 ), 2 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId + 1 ), 2, result -> {} );
 
         // then
         assertEquals( member( 1 ), stateMachine.currentToken().owner() );
@@ -121,16 +122,16 @@ public class ReplicatedLockTokenStateMachineTest
         int firstCandidateId = LockToken.nextCandidateId( stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1 );
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId ), 2 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 1, result -> {} );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId ), 2, result -> {} );
 
         // then
         assertEquals( 0, stateMachine.currentToken().id() );
         assertEquals( member( 0 ), stateMachine.currentToken().owner() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId + 1 ), 3 );
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 4 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 1 ), firstCandidateId + 1 ), 3, result -> {} );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 4, result -> {} );
 
         // then
         assertEquals( 1, stateMachine.currentToken().id() );
@@ -146,31 +147,31 @@ public class ReplicatedLockTokenStateMachineTest
         int firstCandidateId = LockToken.nextCandidateId( stateMachine.currentToken().id() );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 1 ); // not accepted
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 1, result -> {} ); // not accepted
 
         // then
         assertEquals( stateMachine.currentToken().id(), LockToken.INVALID_LOCK_TOKEN_ID );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 2 ); // accepted
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 2, result -> {} ); // accepted
 
         // then
         assertEquals( stateMachine.currentToken().id(), firstCandidateId );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 3 ); // accepted
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 1 ), 3, result -> {} ); // accepted
 
         // then
         assertEquals( stateMachine.currentToken().id(), firstCandidateId + 1 );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 4 ); // not accepted
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId ), 4, result -> {} ); // not accepted
 
         // then
         assertEquals( stateMachine.currentToken().id(), firstCandidateId + 1 );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 3 ), 5 ); // not accepted
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( member( 0 ), firstCandidateId + 3 ), 5, result -> {} ); // not accepted
 
         // then
         assertEquals( stateMachine.currentToken().id(), firstCandidateId + 1 );
@@ -200,9 +201,9 @@ public class ReplicatedLockTokenStateMachineTest
         int candidateId;
 
         candidateId = 0;
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberA, candidateId ), 0 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberA, candidateId ), 0, result -> {} );
         candidateId = 1;
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberB, candidateId ), 1 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberB, candidateId ), 1, result -> {} );
 
         stateMachine.flush();
         fsa.crash();
@@ -235,10 +236,10 @@ public class ReplicatedLockTokenStateMachineTest
         RaftTestMember memberA = new RaftTestMember( 0 );
         RaftTestMember memberB = new RaftTestMember( 1 );
 
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberA, 0 ), 3 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberA, 0 ), 3, result -> {} );
 
         // when
-        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberB, 1 ), 2 );
+        stateMachine.applyCommand( new ReplicatedLockTokenRequest<>( memberB, 1 ), 2, result -> {} );
 
         // then
         assertEquals( memberA, stateMachine.currentToken().owner() );

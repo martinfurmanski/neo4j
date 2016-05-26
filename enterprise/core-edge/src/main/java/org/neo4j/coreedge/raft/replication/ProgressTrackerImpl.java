@@ -47,7 +47,7 @@ public class ProgressTrackerImpl implements ProgressTracker
     }
 
     @Override
-    public void trackReplication( DistributedOperation operation )
+    public synchronized void trackReplication( DistributedOperation operation )
     {
         if( !operation.globalSession().equals( myGlobalSession ) )
         {
@@ -62,7 +62,7 @@ public class ProgressTrackerImpl implements ProgressTracker
     }
 
     @Override
-    public void trackResult( DistributedOperation operation, Result result )
+    public synchronized void trackResult( DistributedOperation operation, Result result )
     {
         if( !operation.globalSession().equals( myGlobalSession ) )
         {

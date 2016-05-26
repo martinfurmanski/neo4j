@@ -21,6 +21,7 @@ package org.neo4j.coreedge.raft.state;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.neo4j.coreedge.catchup.storecopy.core.CoreStateType;
 import org.neo4j.coreedge.raft.log.MonitoredRaftLog;
@@ -74,34 +75,37 @@ public class CoreStateMachines
         this.raftLog = raftLog;
     }
 
-    public Optional<Result> dispatch( ReplicatedTransaction transaction, long commandIndex )
+    public void dispatch( ReplicatedTransaction transaction, long commandIndex, Consumer<Result> consumer )
     {
-        return replicatedTxStateMachine.applyCommand( transaction, commandIndex );
+        replicatedTxStateMachine.applyCommand( transaction, commandIndex, consumer );
     }
 
-    public Optional<Result> dispatch( ReplicatedIdAllocationRequest idRequest, long commandIndex )
+    public void dispatch( ReplicatedIdAllocationRequest idRequest, long commandIndex, Consumer<Result> consumer )
     {
-        return idAllocationStateMachine.applyCommand( idRequest, commandIndex );
+        idAllocationStateMachine.applyCommand( idRequest, commandIndex, consumer );
     }
 
-    public Optional<Result> dispatch( ReplicatedTokenRequest tokenRequest, long commandIndex )
+    public void dispatch( ReplicatedTokenRequest tokenRequest, long commandIndex, Consumer<Result> consumer )
     {
         switch ( tokenRequest.type() )
         {
         case PROPERTY:
-            return propertyKeyTokenStateMachine.applyCommand( tokenRequest, commandIndex );
+            propertyKeyTokenStateMachine.applyCommand( tokenRequest, commandIndex, consumer );
+            break;
         case RELATIONSHIP:
-            return relationshipTypeTokenStateMachine.applyCommand( tokenRequest, commandIndex );
+            relationshipTypeTokenStateMachine.applyCommand( tokenRequest, commandIndex, consumer );
+            break;
         case LABEL:
-            return labelTokenStateMachine.applyCommand( tokenRequest, commandIndex );
+            labelTokenStateMachine.applyCommand( tokenRequest, commandIndex, consumer );
+            break;
         default:
-            throw new IllegalStateException();
+            throw new IllegalStateException( "Unknown token type" );
         }
     }
 
-    public Optional<Result> dispatch( ReplicatedLockTokenRequest lockRequest, long commandIndex )
+    public void dispatch( ReplicatedLockTokenRequest lockRequest, long commandIndex, Consumer<Result> consumer )
     {
-        return replicatedLockTokenStateMachine.applyCommand( lockRequest, commandIndex );
+        replicatedLockTokenStateMachine.applyCommand( lockRequest, commandIndex, consumer );
     }
 
     public void flush() throws IOException

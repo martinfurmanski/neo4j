@@ -21,6 +21,7 @@ package org.neo4j.coreedge.raft.replication.id;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.neo4j.coreedge.raft.state.Result;
 import org.neo4j.coreedge.raft.state.StateMachine;
@@ -43,11 +44,11 @@ public class ReplicatedIdAllocationStateMachine implements StateMachine<Replicat
     }
 
     @Override
-    public synchronized Optional<Result> applyCommand( ReplicatedIdAllocationRequest request, long commandIndex )
+    public synchronized void applyCommand( ReplicatedIdAllocationRequest request, long commandIndex, Consumer<Result> consumer )
     {
         if( commandIndex <= state.logIndex() )
         {
-            return Optional.empty();
+            return;
         }
         state.logIndex( commandIndex );
 
@@ -56,11 +57,11 @@ public class ReplicatedIdAllocationStateMachine implements StateMachine<Replicat
         if ( request.idRangeStart() == firstUnallocated( idType ) )
         {
             state.firstUnallocated( idType, request.idRangeStart() + request.idRangeLength() );
-            return Optional.of( Result.of( true ) );
+            consumer.accept( Result.of( true ) );
         }
         else
         {
-            return Optional.of( Result.of( false ) );
+            consumer.accept( Result.of( false ) );
         }
     }
 
