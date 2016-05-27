@@ -39,6 +39,7 @@ import org.neo4j.coreedge.raft.membership.RaftMembershipManager;
 import org.neo4j.coreedge.raft.net.Inbound;
 import org.neo4j.coreedge.raft.net.Outbound;
 import org.neo4j.coreedge.raft.outcome.AppendLogEntry;
+import org.neo4j.coreedge.raft.outcome.LogCommand;
 import org.neo4j.coreedge.raft.outcome.Outcome;
 import org.neo4j.coreedge.raft.replication.shipping.RaftLogShippingManager;
 import org.neo4j.coreedge.raft.roles.Role;
@@ -183,6 +184,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
             outcome.addLogCommand( appendCommand );
 
             state.update( outcome );
+            handleLog( outcome );
 
             membershipManager.processLog( 0, singletonList( appendCommand ) );
         }
@@ -190,6 +192,14 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
         {
             databaseHealthSupplier.get().panic( e );
             throw new BootstrapException( e );
+        }
+    }
+
+    private void handleLog( Outcome<MEMBER> outcome ) throws IOException, RaftLogCompactedException
+    {
+        for ( LogCommand logCommand : outcome.getLogCommands() )
+        {
+            logCommand.applyTo( entryLog );
         }
     }
 
@@ -301,8 +311,6 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
 
     public synchronized void handle( RaftMessages.RaftMessage<MEMBER> incomingMessage )
     {
-//        System.out.println(incomingMessage);
-//        handleMessage( incomingMessage );
         messageQ.add( incomingMessage );
     }
 
@@ -342,7 +350,7 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
             }
             catch( Throwable e )
             {
-                System.out.println();
+                e.printStackTrace();
             }
         }
     }
@@ -375,15 +383,15 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
         try
         {
             Outcome<MEMBER> outcome = currentRole.handler.handle( incomingMessage, state, log );
+            sendMessages( outcome );
+            handleLogShipping( outcome );
 
             boolean newLeaderWasElected = leaderChanged( outcome, state.leader() );
             boolean newCommittedEntry = outcome.getCommitIndex() > state.commitIndex();
 
-            state.update( outcome ); // updates to raft log happen within
-            sendMessages( outcome );
-
+            state.update( outcome );
+            handleLog( outcome );
             handleTimers( outcome );
-            handleLogShipping( outcome );
 
             membershipManager.processLog( outcome.getCommitIndex(), outcome.getLogCommands() );
             driveMembership( outcome );

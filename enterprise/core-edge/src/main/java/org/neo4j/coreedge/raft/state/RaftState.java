@@ -133,7 +133,7 @@ public class RaftState<MEMBER> implements ReadableRaftState<MEMBER>
         return commitIndex;
     }
 
-    public void update( Outcome<MEMBER> outcome ) throws IOException, RaftLogCompactedException
+    public void update( Outcome<MEMBER> outcome ) throws IOException
     {
         if ( termState.update( outcome.getTerm() ) )
         {
@@ -149,10 +149,6 @@ public class RaftState<MEMBER> implements ReadableRaftState<MEMBER>
         lastLogIndexBeforeWeBecameLeader = outcome.getLastLogIndexBeforeWeBecameLeader();
         followerStates = outcome.getFollowerStates();
 
-        for ( LogCommand logCommand : outcome.getLogCommands() )
-        {
-            logCommand.applyTo( entryLog );
-        }
         commitIndex = outcome.getCommitIndex();
     }
 }

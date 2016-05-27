@@ -119,7 +119,7 @@ public class CoreState extends LifecycleAdapter implements RaftStateMachine, Log
         applier.submit( ( status ) -> () -> {
             try ( RaftLogCursor cursor = raftLog.getEntryCursor( lastApplied + 1 ) )
             {
-                lastApplyingStorage.persistStoreData( lastToApply );
+                //lastApplyingStorage.persistStoreData( lastToApply );
 
                 while ( cursor.next() && cursor.index() <= lastToApply )
                 {
