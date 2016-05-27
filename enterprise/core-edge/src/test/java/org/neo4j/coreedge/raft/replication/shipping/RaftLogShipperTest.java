@@ -44,222 +44,222 @@ import static org.junit.Assert.assertTrue;
 
 public class RaftLogShipperTest
 {
-    private OutboundMessageCollector outbound;
-    private RaftLog raftLog;
-    private Clock clock;
-    private RaftTestMember leader;
-    private RaftTestMember follower;
-    private long leaderTerm;
-    private long leaderCommit;
-    private long retryTimeMillis;
-    private int catchupBatchSize = 64;
-    private int maxAllowedShippingLag = 256;
-
-    private RaftLogShipper<RaftTestMember> logShipper;
-
-    private RaftLogEntry entry0 = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 1000 ) );
-    private RaftLogEntry entry1 = new RaftLogEntry( 0, ReplicatedString.valueOf( "kedha" ) );
-    private RaftLogEntry entry2 = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 2000 ) );
-    private RaftLogEntry entry3 = new RaftLogEntry( 0, ReplicatedString.valueOf( "chupchick" ) );
-
-    @Before
-    public void setup()
-    {
-        // defaults
-        outbound = new OutboundMessageCollector();
-        raftLog = new InMemoryRaftLog();
-        clock = Clock.systemUTC();
-        leader = new RaftTestMember( 0 );
-        follower = new RaftTestMember( 1 );
-        leaderTerm = 0;
-        leaderCommit = 0;
-        retryTimeMillis = 100000;
-    }
-
-    @After
-    public void teardown()
-    {
-        if ( logShipper != null )
-        {
-            logShipper.stop();
-            logShipper = null;
-        }
-    }
-
-    private void startLogShipper()
-    {
-        logShipper = new RaftLogShipper<>( outbound, NullLogProvider.getInstance(), raftLog,
-                clock, leader, follower, leaderTerm, leaderCommit, retryTimeMillis,
-                catchupBatchSize, maxAllowedShippingLag );
-        logShipper.start();
-    }
-
-    @Test
-    public void shouldSendLastEntryOnStart() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        raftLog.append( entry1 );
-
-        // when
-        startLogShipper();
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry1 ) );
-    }
-
-    @Test
-    public void shouldSendPreviousEntryOnMismatch() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        raftLog.append( entry1 );
-        startLogShipper();
-
-        // when
-        outbound.clear();
-        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry0 ) );
-    }
-
-    @Test
-    public void shouldKeepSendingFirstEntryAfterSeveralMismatches() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        raftLog.append( entry1 );
-        startLogShipper();
-
-        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
-        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
-
-        // when
-        outbound.clear();
-        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry0 ) );
-    }
-
-    @Test
-    public void shouldSendNextBatchAfterMatch() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        raftLog.append( entry1 );
-        raftLog.append( entry2 );
-        raftLog.append( entry3 );
-        startLogShipper();
-
-        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
-
-        // when
-        outbound.clear();
-        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry1, entry2, entry3 ) );
-    }
-
-    @Test
-    public void shouldSendNewEntriesAfterMatchingLastEntry() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        startLogShipper();
-
-        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
-
-        // when
-        outbound.clear();
-
-        raftLog.append( entry1 );
-        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
-        raftLog.append( entry2 );
-        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry1, entry2 ) );
-    }
-
-    @Test
-    public void shouldNotSendNewEntriesWhenNotMatched() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        startLogShipper();
-
-        // when
-        outbound.clear();
-        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
-        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertEquals( outbound.sentTo( follower ).size(), 0 );
-    }
-
-    @Test
-    public void shouldResendLastSentEntryOnFirstMismatch() throws Throwable
-    {
-        // given
-        raftLog.append( entry0 );
-        startLogShipper();
-        raftLog.append( entry1 );
-        raftLog.append( entry2 );
-
-        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
-        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
-        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
-
-        // when
-        outbound.clear();
-        logShipper.onMismatch( 1, new LeaderContext( 0, 0 ) );
-
-        // then
-        assertTrue( outbound.hasEntriesTo( follower, entry2 ) );
-    }
-
-    @Test
-    public void shouldSendAllEntriesAndCatchupCompletely() throws Throwable
-    {
-        // given
-        final int ENTRY_COUNT = catchupBatchSize * 10;
-        Collection<RaftLogEntry> entries = new ArrayList<>();
-        for ( int i = 0; i < ENTRY_COUNT; i++ )
-        {
-            entries.add( new RaftLogEntry( 0, ReplicatedInteger.valueOf( i ) ) );
-        }
-
-        for ( RaftLogEntry entry : entries )
-        {
-            raftLog.append( entry );
-        }
-
-        // then
-        startLogShipper();
-
-        // back-tracking stage
-        RaftLogEntry firstEntry = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 0 ) );
-        while ( !outbound.hasEntriesTo( follower, firstEntry ) )
-        {
-            logShipper.onMismatch( -1, new LeaderContext( 0, 0 ) );
-        }
-
-        // catchup stage
-        long matchIndex;
-
-        do
-        {
-            AppendEntries.Request last = (AppendEntries.Request) Iterables.last( outbound.sentTo( follower ) );
-            matchIndex = last.prevLogIndex() + last.entries().length;
-
-            outbound.clear();
-            logShipper.onMatch( matchIndex, new LeaderContext( 0, 0 ) );
-        }
-        while ( outbound.sentTo( follower ).size() > 0 );
-
-        assertEquals( ENTRY_COUNT-1, matchIndex );
-    }
+//    private OutboundMessageCollector outbound;
+//    private RaftLog raftLog;
+//    private Clock clock;
+//    private RaftTestMember leader;
+//    private RaftTestMember follower;
+//    private long leaderTerm;
+//    private long leaderCommit;
+//    private long retryTimeMillis;
+//    private int catchupBatchSize = 64;
+//    private int maxAllowedShippingLag = 256;
+//
+//    private RaftLogShipper<RaftTestMember> logShipper;
+//
+//    private RaftLogEntry entry0 = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 1000 ) );
+//    private RaftLogEntry entry1 = new RaftLogEntry( 0, ReplicatedString.valueOf( "kedha" ) );
+//    private RaftLogEntry entry2 = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 2000 ) );
+//    private RaftLogEntry entry3 = new RaftLogEntry( 0, ReplicatedString.valueOf( "chupchick" ) );
+//
+//    @Before
+//    public void setup()
+//    {
+//        // defaults
+//        outbound = new OutboundMessageCollector();
+//        raftLog = new InMemoryRaftLog();
+//        clock = Clock.systemUTC();
+//        leader = new RaftTestMember( 0 );
+//        follower = new RaftTestMember( 1 );
+//        leaderTerm = 0;
+//        leaderCommit = 0;
+//        retryTimeMillis = 100000;
+//    }
+//
+//    @After
+//    public void teardown()
+//    {
+//        if ( logShipper != null )
+//        {
+//            logShipper.stop();
+//            logShipper = null;
+//        }
+//    }
+//
+//    private void startLogShipper()
+//    {
+//        logShipper = new RaftLogShipper<>( outbound, NullLogProvider.getInstance(), raftLog,
+//                clock, leader, follower, leaderTerm, leaderCommit, retryTimeMillis,
+//                catchupBatchSize, maxAllowedShippingLag );
+//        logShipper.start();
+//    }
+//
+//    @Test
+//    public void shouldSendLastEntryOnStart() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        raftLog.append( entry1 );
+//
+//        // when
+//        startLogShipper();
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry1 ) );
+//    }
+//
+//    @Test
+//    public void shouldSendPreviousEntryOnMismatch() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        raftLog.append( entry1 );
+//        startLogShipper();
+//
+//        // when
+//        outbound.clear();
+//        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry0 ) );
+//    }
+//
+//    @Test
+//    public void shouldKeepSendingFirstEntryAfterSeveralMismatches() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        raftLog.append( entry1 );
+//        startLogShipper();
+//
+//        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
+//        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // when
+//        outbound.clear();
+//        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry0 ) );
+//    }
+//
+//    @Test
+//    public void shouldSendNextBatchAfterMatch() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        raftLog.append( entry1 );
+//        raftLog.append( entry2 );
+//        raftLog.append( entry3 );
+//        startLogShipper();
+//
+//        logShipper.onMismatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // when
+//        outbound.clear();
+//        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry1, entry2, entry3 ) );
+//    }
+//
+//    @Test
+//    public void shouldSendNewEntriesAfterMatchingLastEntry() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        startLogShipper();
+//
+//        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
+//
+//        // when
+//        outbound.clear();
+//
+//        raftLog.append( entry1 );
+//        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
+//        raftLog.append( entry2 );
+//        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry1, entry2 ) );
+//    }
+//
+//    @Test
+//    public void shouldNotSendNewEntriesWhenNotMatched() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        startLogShipper();
+//
+//        // when
+//        outbound.clear();
+//        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
+//        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertEquals( outbound.sentTo( follower ).size(), 0 );
+//    }
+//
+//    @Test
+//    public void shouldResendLastSentEntryOnFirstMismatch() throws Throwable
+//    {
+//        // given
+//        raftLog.append( entry0 );
+//        startLogShipper();
+//        raftLog.append( entry1 );
+//        raftLog.append( entry2 );
+//
+//        logShipper.onMatch( 0, new LeaderContext( 0, 0 ) );
+//        logShipper.onNewEntry( 0, 0, entry1, new LeaderContext( 0, 0 ) );
+//        logShipper.onNewEntry( 1, 0, entry2, new LeaderContext( 0, 0 ) );
+//
+//        // when
+//        outbound.clear();
+//        logShipper.onMismatch( 1, new LeaderContext( 0, 0 ) );
+//
+//        // then
+//        assertTrue( outbound.hasEntriesTo( follower, entry2 ) );
+//    }
+//
+//    @Test
+//    public void shouldSendAllEntriesAndCatchupCompletely() throws Throwable
+//    {
+//        // given
+//        final int ENTRY_COUNT = catchupBatchSize * 10;
+//        Collection<RaftLogEntry> entries = new ArrayList<>();
+//        for ( int i = 0; i < ENTRY_COUNT; i++ )
+//        {
+//            entries.add( new RaftLogEntry( 0, ReplicatedInteger.valueOf( i ) ) );
+//        }
+//
+//        for ( RaftLogEntry entry : entries )
+//        {
+//            raftLog.append( entry );
+//        }
+//
+//        // then
+//        startLogShipper();
+//
+//        // back-tracking stage
+//        RaftLogEntry firstEntry = new RaftLogEntry( 0, ReplicatedInteger.valueOf( 0 ) );
+//        while ( !outbound.hasEntriesTo( follower, firstEntry ) )
+//        {
+//            logShipper.onMismatch( -1, new LeaderContext( 0, 0 ) );
+//        }
+//
+//        // catchup stage
+//        long matchIndex;
+//
+//        do
+//        {
+//            AppendEntries.Request last = (AppendEntries.Request) Iterables.last( outbound.sentTo( follower ) );
+//            matchIndex = last.prevLogIndex() + last.entries().length;
+//
+//            outbound.clear();
+//            logShipper.onMatch( matchIndex, new LeaderContext( 0, 0 ) );
+//        }
+//        while ( outbound.sentTo( follower ).size() > 0 );
+//
+//        assertEquals( ENTRY_COUNT-1, matchIndex );
+//    }
 }

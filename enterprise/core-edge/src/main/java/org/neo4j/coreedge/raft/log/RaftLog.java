@@ -20,6 +20,7 @@
 package org.neo4j.coreedge.raft.log;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Persists entries that are coordinated through RAFT, i.e. this is the log
@@ -41,6 +42,16 @@ public interface RaftLog extends ReadableRaftLog
      * @return the index at which the entry was appended.
      */
     long append( RaftLogEntry entry ) throws IOException;
+
+    default long appendBatch( List<RaftLogEntry> batch ) throws IOException
+    {
+        long newAppendIndex = appendIndex();
+        for ( RaftLogEntry entry : batch )
+        {
+            newAppendIndex = append( entry );
+        }
+        return newAppendIndex;
+    };
 
     /**
      * Truncates the log starting from the supplied index. Committed

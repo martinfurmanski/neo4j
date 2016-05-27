@@ -21,6 +21,7 @@ package org.neo4j.coreedge.raft.log.physical;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 

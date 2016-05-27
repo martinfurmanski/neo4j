@@ -20,7 +20,6 @@
 package org.neo4j.coreedge.raft.state.explorer;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.junit.Test;
 

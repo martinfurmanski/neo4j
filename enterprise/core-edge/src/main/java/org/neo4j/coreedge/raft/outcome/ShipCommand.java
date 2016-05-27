@@ -26,6 +26,8 @@ import org.neo4j.coreedge.raft.replication.shipping.RaftLogShipper;
 import static java.lang.String.format;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
 
 public abstract class ShipCommand
 {
@@ -150,61 +152,48 @@ public abstract class ShipCommand
     {
         private final long prevLogIndex;
         private final long prevLogTerm;
-        private final RaftLogEntry newLogEntry;
+        private final RaftLogEntry[] newLogEntries;
 
-        public NewEntry( long prevLogIndex, long prevLogTerm, RaftLogEntry newLogEntry )
+        public NewEntry( long prevLogIndex, long prevLogTerm, RaftLogEntry[] newLogEntries )
         {
             this.prevLogIndex = prevLogIndex;
             this.prevLogTerm = prevLogTerm;
-            this.newLogEntry = newLogEntry;
+            this.newLogEntries = newLogEntries;
         }
 
         @Override
         public <MEMBER> void applyTo( RaftLogShipper<MEMBER> raftLogShipper, LeaderContext leaderContext ) throws IOException
         {
-            raftLogShipper.onNewEntry( prevLogIndex, prevLogTerm, newLogEntry, leaderContext );
+            raftLogShipper.onNewEntry( prevLogIndex, prevLogTerm, newLogEntries, leaderContext );
         }
 
         @Override
         public boolean equals( Object o )
         {
             if ( this == o )
-            {
-                return true;
-            }
+            { return true; }
             if ( o == null || getClass() != o.getClass() )
-            {
-                return false;
-            }
-
+            { return false; }
             NewEntry newEntry = (NewEntry) o;
-
-            if ( prevLogIndex != newEntry.prevLogIndex )
-            {
-                return false;
-            }
-            if ( prevLogTerm != newEntry.prevLogTerm )
-            {
-                return false;
-            }
-            return newLogEntry.equals( newEntry.newLogEntry );
-
+            return prevLogIndex == newEntry.prevLogIndex &&
+                   prevLogTerm == newEntry.prevLogTerm &&
+                   Arrays.equals( newLogEntries, newEntry.newLogEntries );
         }
 
         @Override
         public int hashCode()
         {
-            int result = (int) (prevLogIndex ^ (prevLogIndex >>> 32));
-            result = 31 * result + (int) (prevLogTerm ^ (prevLogTerm >>> 32));
-            result = 31 * result + newLogEntry.hashCode();
-            return result;
+            return Objects.hash( prevLogIndex, prevLogTerm, newLogEntries );
         }
 
         @Override
         public String toString()
         {
-            return format( "NewEntry{prevLogIndex=%d, prevLogTerm=%d, newLogEntry=%s}", prevLogIndex, prevLogTerm,
-                    newLogEntry );
+            return "NewEntry{" +
+                   "prevLogIndex=" + prevLogIndex +
+                   ", prevLogTerm=" + prevLogTerm +
+                   ", newLogEntries=" + Arrays.toString( newLogEntries ) +
+                   '}';
         }
     }
 

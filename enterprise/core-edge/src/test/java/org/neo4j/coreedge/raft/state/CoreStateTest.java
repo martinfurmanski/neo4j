@@ -19,15 +19,9 @@
  */
 package org.neo4j.coreedge.raft.state;
 
-import org.junit.Test;
-
-import java.util.Optional;
 import java.util.UUID;
 
-import org.neo4j.coreedge.raft.NewLeaderBarrier;
 import org.neo4j.coreedge.raft.log.InMemoryRaftLog;
-import org.neo4j.coreedge.raft.log.RaftLogEntry;
-import org.neo4j.coreedge.raft.log.monitoring.RaftLogCommitIndexMonitor;
 import org.neo4j.coreedge.raft.replication.DistributedOperation;
 import org.neo4j.coreedge.raft.replication.ProgressTrackerImpl;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
@@ -45,12 +39,8 @@ import org.neo4j.logging.NullLogProvider;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 public class CoreStateTest
 {

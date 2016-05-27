@@ -122,7 +122,7 @@ public class Appending
 
         RaftLogEntry newLogEntry = new RaftLogEntry( ctx.term(), content );
 
-        outcome.addShipCommand( new ShipCommand.NewEntry( prevLogIndex, prevLogTerm, newLogEntry ) );
+        outcome.addShipCommand( new ShipCommand.NewEntry( prevLogIndex, prevLogTerm, new RaftLogEntry[]{ newLogEntry } ) );
         outcome.addLogCommand( new AppendLogEntry( prevLogIndex + 1, newLogEntry ) );
     }
 }

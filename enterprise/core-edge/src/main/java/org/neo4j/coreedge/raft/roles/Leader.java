@@ -26,6 +26,8 @@ import org.neo4j.coreedge.raft.RaftMessageHandler;
 import org.neo4j.coreedge.raft.RaftMessages;
 import org.neo4j.coreedge.raft.RaftMessages.Heartbeat;
 import org.neo4j.coreedge.raft.log.RaftLogCompactedException;
+import org.neo4j.coreedge.raft.log.RaftLogEntry;
+import org.neo4j.coreedge.raft.outcome.BatchAppendLogEntries;
 import org.neo4j.coreedge.raft.outcome.Outcome;
 import org.neo4j.coreedge.raft.outcome.ShipCommand;
 import org.neo4j.coreedge.raft.replication.ReplicatedContent;
@@ -36,7 +38,6 @@ import org.neo4j.helpers.collection.FilteringIterable;
 import org.neo4j.logging.Log;
 
 import static java.lang.Math.max;
-
 import static org.neo4j.coreedge.raft.roles.Role.FOLLOWER;
 import static org.neo4j.coreedge.raft.roles.Role.LEADER;
 
@@ -209,6 +210,28 @@ public class Leader implements RaftMessageHandler
                 RaftMessages.NewEntry.Request<MEMBER> req = (RaftMessages.NewEntry.Request<MEMBER>) message;
                 ReplicatedContent content = req.content();
                 Appending.appendNewEntry( ctx, outcome, content );
+                break;
+            }
+
+            case NEW_ENTRY_BATCH:
+            {
+                RaftMessages.NewEntry.Batch<MEMBER> batch = (RaftMessages.NewEntry.Batch<MEMBER>) message;
+
+                long prevLogIndex = ctx.entryLog().appendIndex();
+                long prevLogTerm = prevLogIndex == -1 ? -1 :
+                                   prevLogIndex > ctx.lastLogIndexBeforeWeBecameLeader() ?
+                                   ctx.term() :
+                                   ctx.entryLog().readEntryTerm( prevLogIndex );
+
+                RaftLogEntry[] logEntries = new RaftLogEntry[batch.list().size()];
+                int index = 0;
+                for ( ReplicatedContent content : batch.list() )
+                {
+                    logEntries[index++] = new RaftLogEntry( ctx.term(), content );
+                }
+
+                outcome.addLogCommand( new BatchAppendLogEntries( prevLogIndex + 1, 0, logEntries ) );
+                outcome.addShipCommand( new ShipCommand.NewEntry( prevLogIndex, prevLogTerm, logEntries ) );
                 break;
             }
         }

@@ -21,6 +21,7 @@ package org.neo4j.coreedge.raft.log.segmented;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import org.neo4j.coreedge.raft.log.DamagedLogStorageException;
 import org.neo4j.coreedge.raft.log.EntryRecord;
@@ -114,9 +115,12 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
         updateTerm( entry );
         state.appendIndex++;
 
+        SegmentFile current = state.segments.last();
+
         try
         {
-            state.segments.last().write( state.appendIndex, entry );
+            current.write( state.appendIndex, entry );
+            current.flush();
         }
         catch ( Throwable e )
         {
@@ -124,7 +128,7 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
             throw e;
         }
 
-        if ( state.segments.last().position() >= rotateAtSize )
+        if ( current.position() >= rotateAtSize )
         {
             rotateSegment( state.appendIndex, state.appendIndex, state.currentTerm );
         }
@@ -157,6 +161,39 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
                     format( "Non-monotonic term %d for entry %s in term %d", entry.term(), entry.toString(),
                             state.currentTerm ) );
         }
+    }
+
+    @Override
+    public long appendBatch( List<RaftLogEntry> batch ) throws IOException
+    {
+        SegmentFile current = state.segments.last();
+
+        for ( RaftLogEntry entry : batch )
+        {
+            state.appendIndex++;
+
+            try
+            {
+                current.write( state.appendIndex, entry );
+            }
+            catch ( Throwable e )
+            {
+                needsRecovery = true;
+                throw e;
+            }
+        }
+
+        try
+        {
+            current.flush();
+        }
+        catch ( Throwable e )
+        {
+            needsRecovery = true;
+            throw e;
+        }
+
+        return state.appendIndex;
     }
 
     @Override

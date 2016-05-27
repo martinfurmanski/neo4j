@@ -25,8 +25,6 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
-import org.neo4j.cursor.IOCursor;
-
 public class RaftLogHelper
 {
     public static RaftLogEntry readLogEntry( ReadableRaftLog raftLog, long index ) throws RaftLogCompactedException, IOException

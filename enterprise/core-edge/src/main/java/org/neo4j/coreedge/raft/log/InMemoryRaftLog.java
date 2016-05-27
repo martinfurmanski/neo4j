@@ -21,12 +21,13 @@ package org.neo4j.coreedge.raft.log;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public class InMemoryRaftLog implements RaftLog
 {
-    private final Map<Long, RaftLogEntry> raftLog = new HashMap<>();
+    private final Map<Long,RaftLogEntry> raftLog = new HashMap<>();
 
     private long prevIndex = -1;
     private long prevTerm = -1;

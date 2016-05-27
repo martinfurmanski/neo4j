@@ -395,7 +395,7 @@ public class LeaderTest
 
         ShipCommand.NewEntry shipCommand = (ShipCommand.NewEntry) single( outcome.getShipCommands() );
 
-        assertEquals( shipCommand, new ShipCommand.NewEntry( -1, -1, new RaftLogEntry( 0, CONTENT ) ) );
+        assertEquals( shipCommand, new ShipCommand.NewEntry( -1, -1, new RaftLogEntry[]{ new RaftLogEntry( 0, CONTENT ) } ) );
     }
 
     @Test

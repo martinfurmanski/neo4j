@@ -22,8 +22,6 @@ package org.neo4j.coreedge.raft.log;
 import java.io.IOException;
 
 import org.neo4j.coreedge.raft.log.monitoring.RaftLogAppendIndexMonitor;
-import org.neo4j.coreedge.raft.log.monitoring.RaftLogCommitIndexMonitor;
-import org.neo4j.cursor.IOCursor;
 import org.neo4j.kernel.monitoring.Monitors;
 
 public class MonitoredRaftLog implements RaftLog

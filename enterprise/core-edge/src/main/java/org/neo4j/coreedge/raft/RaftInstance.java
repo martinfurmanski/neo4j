@@ -22,7 +22,10 @@ package org.neo4j.coreedge.raft;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -52,7 +55,7 @@ import org.neo4j.logging.LogProvider;
 
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
-
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.neo4j.coreedge.raft.roles.Role.LEADER;
 
 /**
@@ -138,6 +141,8 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
         initTimers();
 
         inbound.registerHandler( this );
+
+        new Thread( new RaftMessageHandler() ).start();
     }
 
     private void initTimers()
@@ -292,7 +297,80 @@ public class RaftInstance<MEMBER> implements LeaderLocator<MEMBER>,
         return false;
     }
 
+    private BlockingQueue<RaftMessages.RaftMessage<MEMBER>> messageQ = new ArrayBlockingQueue<>( 1024 );
+
     public synchronized void handle( RaftMessages.RaftMessage<MEMBER> incomingMessage )
+    {
+//        System.out.println(incomingMessage);
+//        handleMessage( incomingMessage );
+        messageQ.add( incomingMessage );
+    }
+
+    private class RaftMessageHandler implements Runnable
+    {
+        private int MAX_BATCH = 64;
+
+        private List<RaftMessages.RaftMessage<MEMBER>> messageBatch = new ArrayList<>( MAX_BATCH );
+        private boolean isRunning = true;
+
+        @Override
+        public void run()
+        {
+            try
+            {
+                while ( isRunning )
+                {
+                    RaftMessages.RaftMessage<MEMBER> message = null;
+                    try
+                    {
+                        message = messageQ.poll( 1, MINUTES );
+                    }
+                    catch ( InterruptedException e )
+                    {
+                        // ignored
+                        // will check isRunning
+                    }
+
+                    if ( message != null )
+                    {
+                        messageBatch.add( message );
+                        messageQ.drainTo( messageBatch, MAX_BATCH - 1 );
+                        handleBatch( messageBatch );
+                        messageBatch.clear();
+                    }
+                }
+            }
+            catch( Throwable e )
+            {
+                System.out.println();
+            }
+        }
+    }
+
+    private void handleBatch( List<RaftMessages.RaftMessage<MEMBER>> list )
+    {
+        RaftMessages.NewEntry.Batch<MEMBER> requestBatch = new RaftMessages.NewEntry.Batch<>( myself );
+
+        for ( RaftMessages.RaftMessage<MEMBER> message : list )
+        {
+            if ( message instanceof RaftMessages.NewEntry.Request )
+            {
+                RaftMessages.NewEntry.Request request = (RaftMessages.NewEntry.Request) message;
+                requestBatch.add( request.content() );
+            }
+            else
+            {
+                handleMessage( message );
+            }
+        }
+
+        if ( !requestBatch.list().isEmpty() )
+        {
+            handleMessage( requestBatch );
+        }
+    }
+
+    private void handleMessage( RaftMessages.RaftMessage<MEMBER> incomingMessage )
     {
         try
         {
