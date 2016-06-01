@@ -22,8 +22,6 @@ package org.neo4j.coreedge.raft.log;
 import java.io.IOException;
 
 import org.neo4j.coreedge.raft.log.monitoring.RaftLogAppendIndexMonitor;
-import org.neo4j.coreedge.raft.log.monitoring.RaftLogCommitIndexMonitor;
-import org.neo4j.cursor.IOCursor;
 import org.neo4j.kernel.monitoring.Monitors;
 
 public class MonitoredRaftLog implements RaftLog
@@ -38,9 +36,9 @@ public class MonitoredRaftLog implements RaftLog
     }
 
     @Override
-    public long append( RaftLogEntry entry ) throws IOException
+    public long append( RaftLogEntry... entries ) throws IOException
     {
-        long appendIndex = delegate.append( entry );
+        long appendIndex = delegate.append( entries );
         appendIndexMonitor.appendIndex( appendIndex );
         return appendIndex;
     }

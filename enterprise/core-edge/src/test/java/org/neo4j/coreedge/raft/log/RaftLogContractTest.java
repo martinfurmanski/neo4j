@@ -55,9 +55,10 @@ public abstract class RaftLogContractTest
     {
         // given
         RaftLog log = createRaftLog();
-        log.append( new RaftLogEntry( 45, valueOf( 99 ) ) );
-        log.append( new RaftLogEntry( 46, valueOf( 99 ) ) );
-        log.append( new RaftLogEntry( 47, valueOf( 99 ) ) );
+        log.append(
+                new RaftLogEntry( 45, valueOf( 99 ) ),
+                new RaftLogEntry( 46, valueOf( 99 ) ),
+                new RaftLogEntry( 47, valueOf( 99 ) ) );
 
         // truncate the last 2
         log.truncate( 1 );
@@ -89,8 +90,7 @@ public abstract class RaftLogContractTest
         RaftLogEntry logEntryA = new RaftLogEntry( 1, valueOf( 1 ) );
         RaftLogEntry logEntryB = new RaftLogEntry( 1, valueOf( 2 ) );
 
-        log.append( logEntryA );
-        log.append( logEntryB );
+        log.append( logEntryA, logEntryB );
 
         assertThat( log.appendIndex(), is( 1L ) );
 
@@ -110,14 +110,11 @@ public abstract class RaftLogContractTest
         RaftLogEntry logEntryD = new RaftLogEntry( 1, valueOf( 4 ) );
         RaftLogEntry logEntryE = new RaftLogEntry( 1, valueOf( 5 ) );
 
-        log.append( logEntryA );
-        log.append( logEntryB );
-        log.append( logEntryC );
+        log.append( logEntryA, logEntryB, logEntryC );
 
         log.truncate( 1 );
 
-        log.append( logEntryD );
-        log.append( logEntryE );
+        log.append( logEntryD, logEntryE );
 
         assertThat( log.appendIndex(), is( 2L ) );
         assertThat( readLogEntry( log, 0 ), equalTo( logEntryA ) );
@@ -134,8 +131,7 @@ public abstract class RaftLogContractTest
         RaftLogEntry logEntryA = new RaftLogEntry( 1, valueOf( 1 ) );
         RaftLogEntry logEntryB = new RaftLogEntry( 1, valueOf( 2 ) );
 
-        log.append( logEntryA );
-        log.append( logEntryB );
+        log.append( logEntryA, logEntryB );
 
         try
         {
@@ -163,8 +159,7 @@ public abstract class RaftLogContractTest
         RaftLogEntry logEntryA = new RaftLogEntry( 1, valueOf( 1 ) );
         RaftLogEntry logEntryB = new RaftLogEntry( 1, ReplicatedString.valueOf( "hejzxcjkzhxcjkxz" ) );
 
-        log.append( logEntryA );
-        log.append( logEntryB );
+        log.append( logEntryA, logEntryB );
 
         assertThat( log.appendIndex(), is( 1L ) );
 
@@ -177,8 +172,9 @@ public abstract class RaftLogContractTest
     {
         // given
         RaftLog log = createRaftLog();
-        log.append( new RaftLogEntry( 0, valueOf( 1 ) ) );
-        log.append( new RaftLogEntry( 1, valueOf( 2 ) ) );
+        log.append(
+                new RaftLogEntry( 0, valueOf( 1 ) ),
+                new RaftLogEntry( 1, valueOf( 2 ) ) );
 
         try
         {

@@ -207,7 +207,6 @@ class SegmentFile implements AutoCloseable
     public void write( long logIndex, RaftLogEntry entry ) throws IOException
     {
         EntryRecord.write( getOrCreateWriter(), contentMarshal, logIndex, entry.term(), entry.content() );
-        flush();
     }
 
     void flush() throws IOException

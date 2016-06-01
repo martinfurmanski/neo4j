@@ -108,15 +108,20 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
     }
 
     @Override
-    public synchronized long append( RaftLogEntry entry ) throws IOException
+    public synchronized long append( RaftLogEntry... entries ) throws IOException
     {
         ensureOk();
-        updateTerm( entry );
-        state.appendIndex++;
 
         try
         {
-            state.segments.last().write( state.appendIndex, entry );
+            for ( RaftLogEntry entry : entries )
+            {
+                state.appendIndex++;
+                updateTerm( entry );
+                state.segments.last().write( state.appendIndex, entry );
+                cacheEntry( entry );
+            }
+            state.segments.last().flush();
         }
         catch ( Throwable e )
         {
@@ -127,11 +132,6 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
         if ( state.segments.last().position() >= rotateAtSize )
         {
             rotateSegment( state.appendIndex, state.appendIndex, state.currentTerm );
-        }
-
-        if ( entryCache != null )
-        {
-            entryCache.put( state.appendIndex, entry );
         }
 
         return state.appendIndex;
@@ -168,10 +168,7 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
                     state.appendIndex );
         }
 
-        if ( entryCache != null )
-        {
-            entryCache.clear();
-        }
+        invalidateCache();
 
         long newAppendIndex = fromIndex - 1;
         long newTerm = readEntryTerm( newAppendIndex );
@@ -235,7 +232,7 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
 
     private RaftLogEntry readLogEntry( long logIndex ) throws IOException, RaftLogCompactedException
     {
-        RaftLogEntry entry = entryCache != null ? entryCache.get( logIndex ) : null;
+        RaftLogEntry entry = getFromCache( logIndex );
         if ( entry != null )
         {
             return entry;
@@ -272,5 +269,26 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
         state.prevIndex = oldestNotDisposed.header().prevIndex();
         state.prevTerm = oldestNotDisposed.header().prevTerm();
         return state.prevIndex;
+    }
+
+    private void cacheEntry( RaftLogEntry entry )
+    {
+        if( entryCache != null )
+        {
+            entryCache.put( state.appendIndex, entry );
+        }
+    }
+
+    private RaftLogEntry getFromCache( long logIndex )
+    {
+        return entryCache != null ? entryCache.get( logIndex ) : null;
+    }
+
+    private void invalidateCache()
+    {
+        if ( entryCache != null )
+        {
+            entryCache.clear();
+        }
     }
 }
