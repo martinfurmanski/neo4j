@@ -52,7 +52,11 @@ public class Terms
 
     synchronized void append( long index, long term )
     {
-        if ( index != max + 1 )
+        if ( size == 0 )
+        {
+            skip( index, term );
+        }
+        else if ( index != max + 1 )
         {
             throw new IllegalStateException( "Must append in order" );
         }

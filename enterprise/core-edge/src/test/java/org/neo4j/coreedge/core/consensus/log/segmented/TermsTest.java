@@ -251,6 +251,24 @@ public class TermsTest
     }
 
     @Test
+    public void shouldAppendAfterCompleteTruncation() throws Exception
+    {
+        // given
+        long term = 5;
+        long prevIndex = 10;
+        terms = new Terms( prevIndex, term );
+
+        appendRange( prevIndex + 1, prevIndex + 10, term ); // to be truncated
+
+        // when
+        terms.truncate( prevIndex - 5 );
+        appendRange( prevIndex, prevIndex + 20, term );
+
+        // then
+        assertTermInRange( prevIndex + 1, prevIndex + 20, term );
+    }
+
+    @Test
     public void shouldAppendAfterSkip() throws Exception
     {
         // given
