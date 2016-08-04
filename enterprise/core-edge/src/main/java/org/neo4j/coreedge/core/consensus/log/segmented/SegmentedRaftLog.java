@@ -66,6 +66,7 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
     private final long rotateAtSize;
     private final ChannelMarshal<ReplicatedContent> contentMarshal;
     private final FileNames fileNames;
+    private final int segmentsToRecoverTermsFrom;
     private final JobScheduler scheduler;
     private final Log log;
 
@@ -81,11 +82,21 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
             ChannelMarshal<ReplicatedContent> contentMarshal, LogProvider logProvider,
             String pruningConfig, int readerPoolSize, Clock clock, JobScheduler scheduler )
     {
+        this( fileSystem, directory, rotateAtSize, contentMarshal, logProvider,
+                pruningConfig, readerPoolSize, 1, clock, scheduler );
+    }
+
+    public SegmentedRaftLog( FileSystemAbstraction fileSystem, File directory, long rotateAtSize,
+            ChannelMarshal<ReplicatedContent> contentMarshal, LogProvider logProvider,
+            String pruningConfig, int readerPoolSize, int segmentsToRecoverTermsFrom, Clock clock,
+            JobScheduler scheduler )
+    {
         this.fileSystem = fileSystem;
         this.directory = directory;
         this.rotateAtSize = rotateAtSize;
         this.contentMarshal = contentMarshal;
         this.logProvider = logProvider;
+        this.segmentsToRecoverTermsFrom = segmentsToRecoverTermsFrom;
         this.scheduler = scheduler;
 
         this.fileNames = new FileNames( directory );
@@ -102,7 +113,7 @@ public class SegmentedRaftLog extends LifecycleAdapter implements RaftLog
             throw new IOException( "Could not create: " + directory );
         }
 
-        RecoveryProtocol recoveryProtocol = new RecoveryProtocol( fileSystem, fileNames, readerPool, contentMarshal, logProvider );
+        RecoveryProtocol recoveryProtocol = new RecoveryProtocol( fileSystem, fileNames, readerPool, contentMarshal, logProvider, segmentsToRecoverTermsFrom );
         state = recoveryProtocol.run();
         log.info( "log started with recovered state %s", state );
 

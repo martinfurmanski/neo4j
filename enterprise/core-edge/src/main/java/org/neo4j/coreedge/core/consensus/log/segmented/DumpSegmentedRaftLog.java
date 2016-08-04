@@ -57,7 +57,7 @@ class DumpSegmentedRaftLog
         FileNames fileNames = new FileNames( new File( filenameOrDirectory ) );
         ReaderPool readerPool = new ReaderPool( 0, logProvider, fileNames, fileSystem, systemUTC() );
         RecoveryProtocol recoveryProtocol =
-                new RecoveryProtocol( fileSystem, fileNames, readerPool, marshal, logProvider );
+                new RecoveryProtocol( fileSystem, fileNames, readerPool, marshal, logProvider, Integer.MAX_VALUE );
         Segments segments = recoveryProtocol.run().segments;
 
         segments.visit( (segment) -> {

@@ -24,8 +24,11 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ThreadLocalRandom;
 
+import org.neo4j.coreedge.core.consensus.ReplicatedInteger;
 import org.neo4j.coreedge.core.consensus.log.DummyRaftableContentSerializer;
+import org.neo4j.coreedge.core.consensus.log.RaftLogEntry;
 import org.neo4j.coreedge.core.replication.ReplicatedContent;
 import org.neo4j.coreedge.messaging.marsalling.ChannelMarshal;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
@@ -57,7 +60,7 @@ public class RecoveryProtocolTest
     public void shouldReturnEmptyStateOnEmptyDirectory() throws Exception
     {
         // given
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         // when
         State state = protocol.run();
@@ -77,7 +80,7 @@ public class RecoveryProtocolTest
         createLogFile( fsa, -1, 0, 0, -1, -1 );
         createLogFile( fsa, 5, 2, 2, 5, 0 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         try
         {
@@ -97,7 +100,7 @@ public class RecoveryProtocolTest
         // given
         createLogFile( fsa, -1, 0, 1, -1, -1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         try
         {
@@ -119,7 +122,7 @@ public class RecoveryProtocolTest
         createEmptyLogFile( fsa, 1 );
         createLogFile( fsa, -1, 2, 2, -1, -1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         try
         {
@@ -140,7 +143,7 @@ public class RecoveryProtocolTest
         createLogFile( fsa, -1, 0, 0, -1, -1 );
         createEmptyLogFile( fsa, 1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         // when
         protocol.run();
@@ -157,7 +160,7 @@ public class RecoveryProtocolTest
         createLogFile( fsa, 10, 1, 1, 10,  0 );
         createLogFile( fsa, 20, 2, 2, 20,  1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         // when
         State state = protocol.run();
@@ -178,7 +181,7 @@ public class RecoveryProtocolTest
         createLogFile( fsa, 10, 1, 1, 10,  0 );
         createLogFile( fsa, 20, 2, 2, 20,  1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         // when
         State state = protocol.run();
@@ -199,7 +202,7 @@ public class RecoveryProtocolTest
         createLogFile( fsa, 10, 1, 1, 10,  0 );
         createLogFile( fsa, 20, 2, 2, 20,  1 );
 
-        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance() );
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 1 );
 
         // when
         State state = protocol.run();
@@ -212,13 +215,110 @@ public class RecoveryProtocolTest
         assertEquals(  2, newFile.header().prevTerm() );
     }
 
-    private void createLogFile( EphemeralFileSystemAbstraction fsa, long prevFileLastIndex, long fileNameVersion, long headerVersion, long prevIndex, long prevTerm ) throws IOException
+    @Test
+    public void shouldRecoverAllTermsWhenTruncatingSingleEntry() throws Exception
+    {
+        // given
+        createLogFileWithContent( fsa, -1, 0, 0, -1, -1, 10, 0 ); //  0-- 9 @ term 0
+        createLogFileWithContent( fsa,  9, 1, 1,  9,  0, 10, 1 ); // 10--19 @ term 1
+        createLogFileWithContent( fsa, 19, 2, 2, 18,  1, 10, 2 ); // 19--28 @ term 2 // truncate and overwrite 1 entry (19)
+        createLogFileWithContent( fsa, 28, 3, 3, 28,  2, 10, 3 ); // 29--38 @ term 3
+
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 4 );
+
+        // when
+        State state = protocol.run();
+
+        // then
+        assertEquals( -1 , state.prevIndex );
+        assertEquals( -1 , state.prevTerm );
+        assertEquals( 38 , state.appendIndex );
+
+        assertTermInRange( state.terms,  0,  9, 0 );
+        assertTermInRange( state.terms, 10, 18, 1 );
+        assertTermInRange( state.terms, 19, 28, 2 );
+        assertTermInRange( state.terms, 29, 38, 3 );
+    }
+
+    @Test
+    public void shouldRecoverAllTermsWhenTruncatingSeveralEntries() throws Exception
+    {
+        // given
+        createLogFileWithContent( fsa, -1, 0, 0, -1, -1, 10, 0 ); //  0-- 9 @ term 0
+        createLogFileWithContent( fsa,  9, 1, 1,  9,  0, 10, 1 ); // 10--19 @ term 1
+        createLogFileWithContent( fsa, 19, 2, 2, 14,  1, 10, 2 ); // 15--24 @ term 2 // truncate and overwrite 5 entries (15-19)
+        createLogFileWithContent( fsa, 24, 3, 3, 24,  2, 10, 3 ); // 25--34 @ term 3
+
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 4 );
+
+        // when
+        State state = protocol.run();
+
+        // then
+        assertEquals( -1 , state.prevIndex );
+        assertEquals( -1 , state.prevTerm );
+        assertEquals( 34 , state.appendIndex );
+
+        assertTermInRange( state.terms,  0,  9, 0 );
+        assertTermInRange( state.terms, 10, 14, 1 );
+        assertTermInRange( state.terms, 15, 24, 2 );
+        assertTermInRange( state.terms, 25, 34, 3 );
+    }
+
+    // TODO: This must be handled for ALL segment files. Skips must skip the prevIndex/Term!
+    @Test
+    public void shouldHandleSkipDuringRecovery() throws Exception
+    {
+        // given
+        createLogFileWithContent( fsa, -1, 0, 0, -1, -1, 10, 0 ); //  0-- 9 @ term 0
+        createLogFileWithContent( fsa,  9, 1, 1,  9,  0, 10, 1 ); // 10--19 @ term 1
+        createLogFileWithContent( fsa, 19, 2, 2, 28,  2, 10, 3 ); // 29--38 @ term 3 // skip to (index=28,term=2)
+
+        RecoveryProtocol protocol = new RecoveryProtocol( fsa, fileNames, readerPool, contentMarshal, NullLogProvider.getInstance(), 3 );
+
+        // when
+        State state = protocol.run();
+
+        // then
+        assertEquals( 28 , state.prevIndex );
+        assertEquals( 2 , state.prevTerm );
+        assertEquals( 38 , state.appendIndex );
+
+        assertTermInRange( state.terms,  -1, 27, 0 );
+        assertTermInRange( state.terms, 28, 38, 3 );
+    }
+
+    private void assertTermInRange( Terms terms, long from, long to, long term )
+    {
+        for ( long index = from; index <= to; index++ )
+        {
+            assertEquals( "For index: " + index, term, terms.get( index ) );
+        }
+    }
+
+    private void createLogFile( EphemeralFileSystemAbstraction fsa, long prevFileLastIndex, long fileNameVersion,
+            long headerVersion, long prevIndex, long prevTerm ) throws IOException
     {
         StoreChannel channel = fsa.open( fileNames.getForVersion( fileNameVersion ), "w" );
         PhysicalFlushableChannel writer = new PhysicalFlushableChannel( channel );
         headerMarshal.marshal( new SegmentHeader( prevFileLastIndex, headerVersion, prevIndex, prevTerm ), writer );
         writer.prepareForFlush().flush();
         channel.close();
+    }
+
+    private void createLogFileWithContent( EphemeralFileSystemAbstraction fsa, long prevFileLastIndex, long fileNameVersion,
+            long headerVersion, long prevIndex, long prevTerm, int entryCount, int entryTerm ) throws IOException
+    {
+        SegmentHeader header = new SegmentHeader( prevFileLastIndex, headerVersion, prevIndex, prevTerm );
+        SegmentFile segment = SegmentFile.create( fsa, fileNames.getForVersion( fileNameVersion ), readerPool, fileNameVersion,
+                contentMarshal, NullLogProvider.getInstance(), header );
+
+        for ( int i = 0; i < entryCount; i++ )
+        {
+            segment.write( prevIndex + 1 + i, new RaftLogEntry( entryTerm , ReplicatedInteger.valueOf( i ) ) );
+        }
+
+        segment.close();
     }
 
     private void createEmptyLogFile( EphemeralFileSystemAbstraction fsa, long fileNameVersion ) throws IOException

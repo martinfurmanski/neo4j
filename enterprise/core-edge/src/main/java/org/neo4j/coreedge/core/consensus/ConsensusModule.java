@@ -213,7 +213,10 @@ public class ConsensusModule
                         marshal,
                         logProvider,
                         pruningStrategyConfig,
-                        readerPoolSize, systemUTC(), scheduler ) );
+                        readerPoolSize,
+                        3, // todo: make a configuration
+                        systemUTC(),
+                        scheduler ) );
             }
             default:
                 throw new IllegalStateException( "Unknown raft log implementation: " + raftLogImplementation );

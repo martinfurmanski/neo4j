@@ -23,13 +23,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.SortedMap;
 
 import org.neo4j.coreedge.core.consensus.log.EntryRecord;
 import org.neo4j.coreedge.core.replication.ReplicatedContent;
-import org.neo4j.coreedge.messaging.marsalling.ChannelMarshal;
 import org.neo4j.coreedge.messaging.EndOfStreamException;
+import org.neo4j.coreedge.messaging.marsalling.ChannelMarshal;
 import org.neo4j.cursor.IOCursor;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.fs.StoreChannel;
@@ -38,6 +39,7 @@ import org.neo4j.kernel.impl.transaction.log.ReadAheadChannel;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 
+import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 
 /**
@@ -53,10 +55,11 @@ class RecoveryProtocol
     private final ChannelMarshal<ReplicatedContent> contentMarshal;
     private final LogProvider logProvider;
     private final Log log;
+    private final int segmentsToRecoverTermsFrom;
     private ReaderPool readerPool;
 
     RecoveryProtocol( FileSystemAbstraction fileSystem, FileNames fileNames, ReaderPool readerPool,
-            ChannelMarshal<ReplicatedContent> contentMarshal, LogProvider logProvider )
+            ChannelMarshal<ReplicatedContent> contentMarshal, LogProvider logProvider, int segmentsToRecoverTermsFrom )
     {
         this.fileSystem = fileSystem;
         this.fileNames = fileNames;
@@ -64,6 +67,7 @@ class RecoveryProtocol
         this.contentMarshal = contentMarshal;
         this.logProvider = logProvider;
         this.log = logProvider.getLog( getClass() );
+        this.segmentsToRecoverTermsFrom = segmentsToRecoverTermsFrom;
     }
 
     State run() throws IOException, DamagedLogStorageException, DisposedException
@@ -130,18 +134,7 @@ class RecoveryProtocol
         assert segment != null;
 
         state.segments = new Segments( fileSystem, fileNames, readerPool, segmentFiles, contentMarshal, logProvider, segment.header().version() );
-        state.appendIndex = segment.header().prevIndex();
-        state.terms = new Terms( segment.header().prevIndex(), segment.header().prevTerm() );
-
-        try ( IOCursor<EntryRecord> cursor = segment.getCursor( segment.header().prevIndex() + 1 ) )
-        {
-            while ( cursor.next() )
-            {
-                EntryRecord entry = cursor.get();
-                state.appendIndex = entry.logIndex();
-                state.terms.append( state.appendIndex, entry.logEntry().term() );
-            }
-        }
+        recoverTermsAndAppendIndex( state, segmentFiles, segmentsToRecoverTermsFrom );
 
         if ( mustRecoverLastHeader )
         {
@@ -156,6 +149,55 @@ class RecoveryProtocol
         }
 
         return state;
+    }
+
+    private void recoverTermsAndAppendIndex( State state, List<SegmentFile> segmentFiles, int count )
+            throws IOException, DisposedException, DamagedLogStorageException
+    {
+        assert count > 0;
+        ListIterator<SegmentFile> itr = segmentFiles.listIterator( max( 0, segmentFiles.size() - count ) );
+
+        do
+        {
+            SegmentFile segment = itr.next();
+
+            if ( state.terms == null )
+            {
+                state.terms = new Terms( segment.header().prevIndex(), segment.header().prevTerm() );
+            }
+            else if( segment.header().prevFileLastIndex() != state.appendIndex )
+            {
+                throw new DamagedLogStorageException( "Expected prevFileLastIndex: %d but header was: %s", state.appendIndex, segment.header() );
+            }
+            else if ( segment.header().prevFileLastIndex() == segment.header().prevIndex() )
+            {
+                if ( segment.header().prevTerm() != state.terms.latest() )
+                {
+                    throw new DamagedLogStorageException( "Expected prevTerm: %d but header was: %s", state.terms.latest(), segment.header() );
+                }
+            }
+            else if ( segment.header().prevFileLastIndex() > segment.header().prevIndex() )
+            {
+                state.terms.truncate( segment.header().prevIndex() + 1 );
+            }
+            else if ( segment.header().prevFileLastIndex() < segment.header().prevIndex() )
+            {
+                state.terms.skip( segment.header().prevIndex(), segment.header().prevTerm() );
+            }
+
+            state.appendIndex = segment.header().prevIndex();
+
+            try ( IOCursor<EntryRecord> cursor = segment.getCursor( segment.header().prevIndex() + 1 ) )
+            {
+                while ( cursor.next() )
+                {
+                    EntryRecord entry = cursor.get();
+                    state.appendIndex = entry.logIndex();
+                    state.terms.append( state.appendIndex, entry.logEntry().term() );
+                }
+            }
+        }
+        while ( itr.hasNext() );
     }
 
     private static SegmentHeader loadHeader(

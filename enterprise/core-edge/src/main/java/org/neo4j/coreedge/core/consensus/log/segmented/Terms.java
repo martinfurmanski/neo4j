@@ -31,9 +31,8 @@ import static java.lang.Math.max;
  * functions and must be invoked from respective places.
  *
  * During recovery truncate should be called between every segment
- * switch to "simulate" eventual truncations as a reason for switching
- * segments. It is ok to call truncate even if the reason was not a
- * truncation.
+ * switch to "simulate" eventual truncations and skips as a reason
+ * for switching segments.
  */
 public class Terms
 {
