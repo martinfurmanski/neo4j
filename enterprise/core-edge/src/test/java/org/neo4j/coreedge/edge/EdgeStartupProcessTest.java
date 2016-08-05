@@ -29,12 +29,10 @@ import org.neo4j.coreedge.catchup.storecopy.LocalDatabase;
 import org.neo4j.coreedge.catchup.storecopy.StoreFetcher;
 import org.neo4j.coreedge.core.state.machines.tx.ConstantTimeRetryStrategy;
 import org.neo4j.coreedge.discovery.ClusterTopology;
-import org.neo4j.coreedge.discovery.EdgeTopologyService;
 import org.neo4j.coreedge.discovery.TopologyService;
 import org.neo4j.coreedge.identity.MemberId;
 import org.neo4j.coreedge.identity.StoreId;
 import org.neo4j.coreedge.messaging.routing.AlwaysChooseFirstMember;
-import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.transaction.state.DataSourceManager;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.logging.NullLogProvider;
@@ -68,8 +66,7 @@ public class EdgeStartupProcessTest
 
         EdgeStartupProcess edgeStartupProcess = new EdgeStartupProcess( storeFetcher, localDatabase,
                 txPulling, dataSourceManager, new AlwaysChooseFirstMember( hazelcastTopology ),
-                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance(),
-                Mockito.mock( EdgeTopologyService.class ), Config.empty() );
+                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance() );
 
         // when
         edgeStartupProcess.start();
@@ -106,8 +103,7 @@ public class EdgeStartupProcessTest
 
         EdgeStartupProcess edgeStartupProcess = new EdgeStartupProcess( storeFetcher, localDatabase,
                 txPulling, dataSourceManager, new AlwaysChooseFirstMember( hazelcastTopology ),
-                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance(),
-                Mockito.mock( EdgeTopologyService.class ), Config.empty() );
+                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance() );
 
         // when
         try
@@ -152,8 +148,7 @@ public class EdgeStartupProcessTest
 
         EdgeStartupProcess edgeStartupProcess = new EdgeStartupProcess( storeFetcher, localDatabase,
                 txPulling, dataSourceManager, new AlwaysChooseFirstMember( hazelcastTopology ),
-                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance(),
-                Mockito.mock( EdgeTopologyService.class ), Config.empty() );
+                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance() );
 
         // when
         edgeStartupProcess.start();
@@ -185,8 +180,7 @@ public class EdgeStartupProcessTest
         Lifecycle txPulling = Mockito.mock( Lifecycle.class );
         EdgeStartupProcess edgeStartupProcess = new EdgeStartupProcess( storeFetcher, localDatabase,
                 txPulling, dataSourceManager, new AlwaysChooseFirstMember( hazelcastTopology ),
-                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance(),
-                Mockito.mock( EdgeTopologyService.class ), null );
+                new ConstantTimeRetryStrategy( 1, MILLISECONDS ), NullLogProvider.getInstance() );
 
         // when
         edgeStartupProcess.stop();
