@@ -20,17 +20,22 @@
 package org.neo4j.coreedge.core.state.machines.tx;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import org.neo4j.coreedge.core.state.Result;
 import org.neo4j.coreedge.core.state.machines.StateMachine;
 import org.neo4j.coreedge.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.helpers.NamedThreadFactory;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionQueue;
 import org.neo4j.kernel.impl.api.TransactionToApply;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
+import org.neo4j.kernel.impl.transaction.command.Command;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
@@ -48,6 +53,7 @@ public class ReplicatedTransactionStateMachine implements StateMachine<Replicate
 
     private TransactionQueue queue;
     private long lastCommittedIndex = -1;
+    private NeoStores neoStores;
 
     public ReplicatedTransactionStateMachine( ReplicatedLockTokenStateMachine lockStateMachine,
             int maxBatchSize, LogProvider logProvider )
@@ -57,9 +63,10 @@ public class ReplicatedTransactionStateMachine implements StateMachine<Replicate
         this.log = logProvider.getLog( getClass() );
     }
 
-    public synchronized void installCommitProcess( TransactionCommitProcess commitProcess, long lastCommittedIndex )
+    public synchronized void installCommitProcess( TransactionCommitProcess commitProcess, long lastCommittedIndex, NeoStores neoStores )
     {
         this.lastCommittedIndex = lastCommittedIndex;
+        this.neoStores = neoStores;
         log.info( format("Updated lastCommittedIndex to %d", lastCommittedIndex) );
         this.queue = new TransactionQueue( maxBatchSize,  (first, last) ->
             commitProcess.commit( first, CommitEvent.NULL, TransactionApplicationMode.EXTERNAL ) );
@@ -92,6 +99,7 @@ public class ReplicatedTransactionStateMachine implements StateMachine<Replicate
         {
             try
             {
+                preload( tx );
                 TransactionToApply transaction = new TransactionToApply( tx );
                 transaction.onClose( txId -> callback.accept( Result.of( txId ) ) );
                 queue.queue( transaction );
@@ -101,6 +109,23 @@ public class ReplicatedTransactionStateMachine implements StateMachine<Replicate
                 throw panicException( e );
             }
         }
+    }
+
+    private ExecutorService es = Executors.newFixedThreadPool( 8, NamedThreadFactory.named( "preloader" ) );
+
+    private void preload( TransactionRepresentation tx ) throws IOException
+    {
+        es.submit( () ->
+        {
+            try
+            {
+                tx.accept( element -> ((Command) element).handle( new PageCachePreloader( neoStores ) ) );
+            }
+            catch ( IOException e )
+            {
+                // ignored
+            }
+        } );
     }
 
     @Override

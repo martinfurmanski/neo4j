@@ -247,7 +247,7 @@ public class NeoStores implements AutoCloseable
      * @return store of requested type
      * @throws IllegalStateException if opened store not found
      */
-    private Object getStore( StoreType storeType )
+    public Object getStore( StoreType storeType )
     {
         Object store = stores[storeType.ordinal()];
         if ( store == null )

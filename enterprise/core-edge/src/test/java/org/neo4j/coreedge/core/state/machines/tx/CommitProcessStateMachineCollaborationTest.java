@@ -27,6 +27,7 @@ import org.neo4j.coreedge.core.state.machines.locks.ReplicatedLockTokenStateMach
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.transaction.log.PhysicalTransactionRepresentation;
 import org.neo4j.logging.NullLogProvider;
 
@@ -49,7 +50,7 @@ public class CommitProcessStateMachineCollaborationTest
         TransactionCommitProcess localCommitProcess = mock( TransactionCommitProcess.class );
         ReplicatedTransactionStateMachine stateMachine = new ReplicatedTransactionStateMachine(
                 lockState( finalLockSessionId ), 16, NullLogProvider.getInstance() );
-        stateMachine.installCommitProcess( localCommitProcess, -1L );
+        stateMachine.installCommitProcess( localCommitProcess, -1L, mock( NeoStores.class ) );
 
         DirectReplicator<ReplicatedTransaction> replicator = new DirectReplicator<>( stateMachine );
         ReplicatedTransactionCommitProcess commitProcess = new ReplicatedTransactionCommitProcess( replicator );

@@ -40,6 +40,7 @@ import org.neo4j.coreedge.core.state.machines.locks.ReplicatedLockTokenStateMach
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
 import org.neo4j.kernel.impl.core.RelationshipTypeToken;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreType;
 import org.neo4j.storageengine.api.Token;
 
@@ -128,12 +129,12 @@ public class CoreStateMachines
         // transactions and tokens live in the store
     }
 
-    void refresh( TransactionRepresentationCommitProcess localCommit )
+    void refresh( TransactionRepresentationCommitProcess localCommit, NeoStores neoStores )
     {
         assert !runningBatch;
 
         long lastAppliedIndex = txLogState.findLastAppliedIndex();
-        replicatedTxStateMachine.installCommitProcess( localCommit, lastAppliedIndex );
+        replicatedTxStateMachine.installCommitProcess( localCommit, lastAppliedIndex, neoStores );
 
         labelTokenStateMachine.installCommitProcess( localCommit, lastAppliedIndex );
         relationshipTypeTokenStateMachine.installCommitProcess( localCommit, lastAppliedIndex );

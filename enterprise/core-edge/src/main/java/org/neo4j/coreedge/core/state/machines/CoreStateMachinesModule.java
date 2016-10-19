@@ -58,6 +58,7 @@ import org.neo4j.kernel.impl.factory.CommunityEditionModule;
 import org.neo4j.kernel.impl.factory.PlatformModule;
 import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.logging.LogService;
+import org.neo4j.kernel.impl.storageengine.impl.recordstorage.RecordStorageEngine;
 import org.neo4j.kernel.impl.store.id.IdType;
 import org.neo4j.kernel.impl.store.id.configuration.IdTypeConfigurationProvider;
 import org.neo4j.kernel.impl.store.stats.IdBasedStoreEntityCounters;
@@ -182,10 +183,10 @@ public class CoreStateMachinesModule
                 relationshipTypeTokenStateMachine, propertyKeyTokenStateMachine, replicatedLockTokenStateMachine,
                 idAllocationStateMachine, txLogState, localDatabase );
 
-        commitProcessFactory = ( appender, applier, ignored ) -> {
+        commitProcessFactory = ( appender, storageEngine, ignored ) -> {
             TransactionRepresentationCommitProcess localCommit =
-                    new TransactionRepresentationCommitProcess( appender, applier );
-            coreStateMachines.refresh( localCommit ); // This gets called when a core-to-core download is performed.
+                    new TransactionRepresentationCommitProcess( appender, storageEngine );
+            coreStateMachines.refresh( localCommit, ((RecordStorageEngine)storageEngine).testAccessNeoStores() ); // This gets called when a core-to-core download is performed.
             return new ReplicatedTransactionCommitProcess( replicator );
         };
 

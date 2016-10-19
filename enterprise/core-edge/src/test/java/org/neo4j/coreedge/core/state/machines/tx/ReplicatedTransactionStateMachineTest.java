@@ -30,6 +30,7 @@ import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.transaction.log.FakeCommitment;
 import org.neo4j.kernel.impl.transaction.log.PhysicalTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
@@ -64,7 +65,7 @@ public class ReplicatedTransactionStateMachineTest
 
         ReplicatedTransactionStateMachine stateMachine =
                 new ReplicatedTransactionStateMachine( lockState( lockSessionId ), batchSize, logProvider );
-        stateMachine.installCommitProcess( localCommitProcess, -1L );
+        stateMachine.installCommitProcess( localCommitProcess, -1L, mock( NeoStores.class ) );
 
         // when
         stateMachine.applyCommand( tx, 0, r -> {} );
@@ -89,7 +90,7 @@ public class ReplicatedTransactionStateMachineTest
 
         final ReplicatedTransactionStateMachine stateMachine =
                 new ReplicatedTransactionStateMachine( lockState( currentLockSessionId ), batchSize, logProvider );
-        stateMachine.installCommitProcess( localCommitProcess, -1L );
+        stateMachine.installCommitProcess( localCommitProcess, -1L, mock( NeoStores.class ) );
 
         AtomicBoolean called = new AtomicBoolean();
         // when
@@ -130,7 +131,7 @@ public class ReplicatedTransactionStateMachineTest
 
         ReplicatedTransactionStateMachine stateMachine =
                 new ReplicatedTransactionStateMachine( lockState( currentLockSessionId ), batchSize, logProvider );
-        stateMachine.installCommitProcess( localCommitProcess, -1L );
+        stateMachine.installCommitProcess( localCommitProcess, -1L, mock( NeoStores.class ) );
 
         AtomicBoolean called = new AtomicBoolean();
 
