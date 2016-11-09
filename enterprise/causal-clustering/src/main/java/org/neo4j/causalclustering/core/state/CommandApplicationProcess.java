@@ -58,17 +58,17 @@ public class CommandApplicationProcess extends LifecycleAdapter
     private final Supplier<DatabaseHealth> dbHealth;
     private final InFlightMap<RaftLogEntry> inFlightMap;
     private final Log log;
-    private final CoreStateApplier applier;
+    private final ControlledTask applyTask;
     private final RaftLogCommitIndexMonitor commitIndexMonitor;
     private final OperationBatcher batcher;
     private StatUtil.StatContext batchStat;
 
     private CoreStateMachines coreStateMachines;
 
-    private boolean started;
     private long lastApplied = NOTHING;
-    private volatile long lastSeenCommitIndex = NOTHING;
+    private MonotonicSequenceWaiter applyIndexWaiter = new MonotonicSequenceWaiter( NOTHING );
     private long lastFlushed = NOTHING;
+    private volatile boolean abortFlag;
 
     public CommandApplicationProcess(
             CoreStateMachines coreStateMachines,
@@ -80,7 +80,6 @@ public class CommandApplicationProcess extends LifecycleAdapter
             ProgressTracker progressTracker,
             StateStorage<Long> lastFlushedStorage,
             SessionTracker sessionTracker,
-            CoreStateApplier applier,
             InFlightMap<RaftLogEntry> inFlightMap,
             Monitors monitors )
     {
@@ -90,83 +89,63 @@ public class CommandApplicationProcess extends LifecycleAdapter
         this.flushEvery = flushEvery;
         this.progressTracker = progressTracker;
         this.sessionTracker = sessionTracker;
-        this.applier = applier;
         this.log = logProvider.getLog( getClass() );
         this.dbHealth = dbHealth;
         this.inFlightMap = inFlightMap;
         this.commitIndexMonitor = monitors.newMonitor( RaftLogCommitIndexMonitor.class, getClass() );
         this.batcher = new OperationBatcher( maxBatchSize );
         this.batchStat = StatUtil.create( "BatchSize", log, 4096, true );
+        this.applyTask = new ControlledTask( this::applyTask, "command-applier" );
     }
 
     synchronized void notifyCommitted( long commitIndex )
     {
-        assert this.lastSeenCommitIndex <= commitIndex;
+        applyIndexWaiter.set( commitIndex );
+        commitIndexMonitor.commitIndex( commitIndex );
+    }
 
-        if ( this.lastSeenCommitIndex < commitIndex )
+    private void applyTask()
+    {
+        long lastIndex = NOTHING;
+
+        try
         {
-            this.lastSeenCommitIndex = commitIndex;
-
-            /* ReplicationModule might already be up and running, but we might not
-               yet be ready to handle requests for applying committed state. At startup
-               the lastSeenCommitIndex will be taken into consideration. */
-            if ( started )
-            {
-                submitApplyJob( commitIndex );
-                commitIndexMonitor.commitIndex( commitIndex );
-            }
+            lastIndex = applyIndexWaiter.awaitGreaterThan( lastApplied );
+            applyUpTo( lastIndex );
+        }
+        catch ( Throwable e )
+        {
+            log.error( "Failed to apply up to index " + lastIndex, e );
+            dbHealth.get().panic( e );
         }
     }
 
-    private void submitApplyJob( long lastToApply )
+    private void applyUpTo( long lastIndex ) throws Exception
     {
-        boolean success = applier.submit( ( status ) -> () ->
+        try ( InFlightLogEntryReader logEntrySupplier = new InFlightLogEntryReader( raftLog, inFlightMap, true ) )
         {
-            try ( InFlightLogEntryReader logEntrySupplier = new InFlightLogEntryReader( raftLog, inFlightMap, true ) )
+            for ( long logIndex = lastApplied + 1; logIndex <= lastIndex && !abortFlag; logIndex++ )
             {
-                for ( long logIndex = lastApplied + 1; !status.isCancelled() && logIndex <= lastSeenCommitIndex; logIndex++ )
+                RaftLogEntry entry = logEntrySupplier.get( logIndex );
+                if ( entry == null )
                 {
-                    RaftLogEntry entry = logEntrySupplier.get( logIndex );
-                    if ( entry == null )
-                    {
-                        throw new IllegalStateException( format( "Committed log %d entry must exist.", logIndex ) );
-                    }
-
-                    if ( entry.content() instanceof DistributedOperation )
-                    {
-                        DistributedOperation distributedOperation = (DistributedOperation) entry.content();
-                        progressTracker.trackReplication( distributedOperation );
-                        batcher.add( logIndex, distributedOperation );
-                    }
-                    else
-                    {
-                        batcher.flush();
-                        // since this last entry didn't get in the batcher we need to update the lastApplied:
-                        lastApplied = logIndex;
-                    }
+                    throw new IllegalStateException( format( "Committed log %d entry must exist.", logIndex ) );
                 }
-                batcher.flush();
-            }
-            catch ( Throwable e )
-            {
-                log.error( "Failed to apply up to index " + lastToApply, e );
-                dbHealth.get().panic( e );
-                applier.panic();
-            }
-        } );
 
-        if ( !success )
-        {
-            log.error( "Applier has entered a state of panic, no more jobs can be submitted." );
-            try
-            {
-                // Let's sleep a while so that the log does not get flooded in this state.
-                // TODO: Consider triggering a shutdown of the database on panic.
-                Thread.sleep( 1000 );
+                if ( entry.content() instanceof DistributedOperation )
+                {
+                    DistributedOperation distributedOperation = (DistributedOperation) entry.content();
+                    progressTracker.trackReplication( distributedOperation );
+                    batcher.add( logIndex, distributedOperation );
+                }
+                else
+                {
+                    batcher.flush();
+                    // since this last entry didn't get in the batcher we need to update the lastApplied:
+                    lastApplied = logIndex;
+                }
             }
-            catch ( InterruptedException ignored )
-            {
-            }
+            batcher.flush();
         }
     }
 
@@ -175,9 +154,23 @@ public class CommandApplicationProcess extends LifecycleAdapter
         return lastApplied;
     }
 
+    private void syncApplierAbortOperations()
+    {
+        abortFlag = true;
+
+        applyIndexWaiter.disable();
+        applyTask.pause();
+    }
+
+    private void syncApplierNoAbort()
+    {
+        applyIndexWaiter.disable();
+        applyTask.pause();
+    }
+
     public synchronized void sync() throws InterruptedException
     {
-        applier.sync( true );
+        syncApplierAbortOperations();
     }
 
     private class OperationBatcher
@@ -290,30 +283,20 @@ public class CommandApplicationProcess extends LifecycleAdapter
         /* Considering the order in which state is flushed, the state machines will
          * always be furthest ahead and indicate the furthest possible state to
          * which we must replay to reach a consistent state. */
-        long lastPossiblyApplying = max( coreStateMachines.getLastAppliedIndex(), sessionTracker.getLastAppliedIndex() );
-        lastPossiblyApplying = max( lastPossiblyApplying, lastSeenCommitIndex );
-
-        if ( lastPossiblyApplying > lastApplied )
-        {
-            log.info( "Applying up to: " + lastPossiblyApplying );
-            submitApplyJob( lastPossiblyApplying );
-            applier.sync( false );
-        }
-
-        started = true;
+        applyIndexWaiter.set( max( coreStateMachines.getLastAppliedIndex(), sessionTracker.getLastAppliedIndex() ) );
+        syncApplierNoAbort();
     }
 
     @Override
     public synchronized void stop() throws InterruptedException, IOException
     {
-        started = false;
-        applier.sync( true );
+        syncApplierAbortOperations();
         flush();
     }
 
     public synchronized CoreSnapshot snapshot( RaftMachine raft ) throws IOException, InterruptedException
     {
-        applier.sync( false );
+        syncApplierNoAbort();
 
         long prevIndex = lastApplied;
         long prevTerm = raftLog.readEntryTerm( prevIndex );

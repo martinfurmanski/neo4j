@@ -86,7 +86,7 @@ public class CommandApplicationProcessTest
     private final CommandApplicationProcess applicationProcess = new CommandApplicationProcess(
             coreStateMachines, raftLog, batchSize, flushEvery, () -> dbHealth,
             NullLogProvider.getInstance(), new ProgressTrackerImpl( globalSession ), lastFlushedStorage,
-            sessionStorage, applier, inFlightMap, monitors );
+            sessionStorage, inFlightMap, monitors );
 
     private ReplicatedTransaction nullTx = new ReplicatedTransaction( null );
 

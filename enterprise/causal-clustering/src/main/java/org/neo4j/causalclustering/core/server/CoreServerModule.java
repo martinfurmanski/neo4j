@@ -46,7 +46,6 @@ import org.neo4j.causalclustering.core.consensus.membership.MembershipWaiterLife
 import org.neo4j.causalclustering.core.state.ClusteringModule;
 import org.neo4j.causalclustering.core.state.CommandApplicationProcess;
 import org.neo4j.causalclustering.core.state.CoreState;
-import org.neo4j.causalclustering.core.state.CoreStateApplier;
 import org.neo4j.causalclustering.core.state.LongIndexMarshal;
 import org.neo4j.causalclustering.core.state.machines.CoreStateMachinesModule;
 import org.neo4j.causalclustering.core.state.snapshot.CoreStateDownloader;
@@ -122,8 +121,6 @@ public class CoreServerModule
                 new StoreCopyClient( catchUpClient ), new TxPullClient( catchUpClient, platformModule.monitors ),
                 new TransactionLogCatchUpFactory() );
 
-        CoreStateApplier coreStateApplier = new CoreStateApplier( logProvider );
-
         CopiedStoreRecovery copiedStoreRecovery = new CopiedStoreRecovery( config,
                 platformModule.kernelExtensions.listFactories(), platformModule.pageCache );
 
@@ -160,7 +157,7 @@ public class CoreServerModule
                         config.get( CausalClusteringSettings.state_machine_apply_max_batch_size ),
                         config.get( CausalClusteringSettings.state_machine_flush_window_size ), databaseHealthSupplier,
                         logProvider, replicationModule.getProgressTracker(), lastFlushedStorage,
-                        replicationModule.getSessionTracker(), coreStateApplier, consensusModule.inFlightMap(),
+                        replicationModule.getSessionTracker(), consensusModule.inFlightMap(),
                         platformModule.monitors );
         CoreState coreState =
                 new CoreState( consensusModule.raftMachine(), localDatabase, clusteringModule.clusterIdentity(),
