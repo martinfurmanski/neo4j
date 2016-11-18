@@ -59,7 +59,7 @@ public class BatchingTxApplierTest
     private final int maxBatchSize = 16;
 
     private final BatchingTxApplier txApplier = new BatchingTxApplier( maxBatchSize, () -> idStore, () -> commitProcess,
-            () -> dbHealth, new Monitors(), NullLogProvider.getInstance() );
+            new Monitors(), NullLogProvider.getInstance() );
 
     @Before
     public void before() throws Throwable

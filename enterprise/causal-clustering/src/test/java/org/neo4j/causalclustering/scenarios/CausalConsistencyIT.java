@@ -22,7 +22,7 @@ package org.neo4j.causalclustering.scenarios;
 import org.junit.Rule;
 import org.junit.Test;
 
-import org.neo4j.causalclustering.catchup.tx.TxPollingClient;
+import org.neo4j.causalclustering.catchup.tx.CatchupPollingProcess;
 import org.neo4j.causalclustering.core.CoreGraphDatabase;
 import org.neo4j.causalclustering.discovery.Cluster;
 import org.neo4j.causalclustering.readreplica.ReadReplicaGraphDatabase;
@@ -68,8 +68,8 @@ public class CausalConsistencyIT
         Cluster cluster = clusterRule.startCluster();
 
         ReadReplicaGraphDatabase readReplicaGraphDatabase = cluster.findAnyReadReplica().database();
-        TxPollingClient pollingClient = readReplicaGraphDatabase.getDependencyResolver()
-                .resolveDependency( TxPollingClient.class );
+        CatchupPollingProcess pollingClient = readReplicaGraphDatabase.getDependencyResolver()
+                .resolveDependency( CatchupPollingProcess.class );
         pollingClient.pause();
 
         cluster.coreTx( ( coreGraphDatabase, transaction ) -> {

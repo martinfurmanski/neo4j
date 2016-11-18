@@ -48,10 +48,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.causalclustering.catchup.tx.TxPollingClient.Timeouts.TX_PULLER_TIMEOUT;
+import static org.neo4j.causalclustering.catchup.tx.CatchupPollingProcess.Timeouts.TX_PULLER_TIMEOUT;
 import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.BASE_TX_ID;
 
-public class TxPollingClientTest
+public class CatchupPollingProcessTest
 {
     private final CatchUpClient catchUpClient = mock( CatchUpClient.class );
     private final CoreMemberSelectionStrategy serverSelection = mock( CoreMemberSelectionStrategy.class );
@@ -72,8 +72,8 @@ public class TxPollingClientTest
     }
     private final Lifecycle startStopOnStoreCopy = mock( Lifecycle.class );
 
-    private final TxPollingClient txPuller =
-            new TxPollingClient( NullLogProvider.getInstance(), fs, localDatabase, startStopOnStoreCopy, storeFetcher,
+    private final CatchupPollingProcess txPuller =
+            new CatchupPollingProcess( NullLogProvider.getInstance(), fs, localDatabase, startStopOnStoreCopy, storeFetcher,
                     catchUpClient, serverSelection, timeoutService, txPullIntervalMillis, txApplier, new Monitors(),
                     copiedStoreRecovery );
 
