@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ExponentialBackoffStrategy implements RetryStrategy
 {
-    protected final long initialBackoffTimeMillis;
+    private final long initialBackoffTimeMillis;
 
     public ExponentialBackoffStrategy( long initialBackoffTime, TimeUnit timeUnit )
     {

@@ -22,21 +22,21 @@ package org.neo4j.causalclustering.core.replication.session;
 /** Context for operation. Used for acquirement and release. */
 public class OperationContext
 {
-    private final GlobalSession globalSession;
+    private final GlobalSessionId globalSessionId;
     private final LocalOperationId localOperationId;
 
     private final LocalSession localSession;
 
-    public OperationContext( GlobalSession globalSession, LocalOperationId localOperationId, LocalSession localSession )
+    public OperationContext( GlobalSessionId globalSessionId, LocalOperationId localOperationId, LocalSession localSession )
     {
-        this.globalSession = globalSession;
+        this.globalSessionId = globalSessionId;
         this.localOperationId = localOperationId;
         this.localSession = localSession;
     }
 
-    public GlobalSession globalSession()
+    public GlobalSessionId globalSessionId()
     {
-        return globalSession;
+        return globalSessionId;
     }
 
     public LocalOperationId localOperationId()
@@ -44,7 +44,7 @@ public class OperationContext
         return localOperationId;
     }
 
-    protected LocalSession localSession()
+    LocalSession localSession()
     {
         return localSession;
     }
@@ -53,8 +53,13 @@ public class OperationContext
     public String toString()
     {
         return "OperationContext{" +
-               "globalSession=" + globalSession +
+               "globalSessionId=" + globalSessionId +
                ", localOperationId=" + localOperationId +
                '}';
+    }
+
+    public GlobalSession globalSession()
+    {
+        return new GlobalSession( globalSessionId, localOperationId );
     }
 }

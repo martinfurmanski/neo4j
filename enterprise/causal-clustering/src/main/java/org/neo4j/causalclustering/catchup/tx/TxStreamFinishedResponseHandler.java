@@ -22,17 +22,17 @@ package org.neo4j.causalclustering.catchup.tx;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import org.neo4j.causalclustering.catchup.CatchUpResponseHandler;
-import org.neo4j.causalclustering.catchup.CatchupClientProtocol;
+import org.neo4j.causalclustering.catchup.CoreResponseHandler;
+import org.neo4j.causalclustering.catchup.CoreClientProtocol;
 
-import static org.neo4j.causalclustering.catchup.CatchupClientProtocol.State;
+import static org.neo4j.causalclustering.catchup.CoreClientProtocol.State;
 
 public class TxStreamFinishedResponseHandler extends SimpleChannelInboundHandler<TxStreamFinishedResponse>
 {
-    private final CatchupClientProtocol protocol;
-    private final CatchUpResponseHandler handler;
+    private final CoreClientProtocol protocol;
+    private final CoreResponseHandler handler;
 
-    public TxStreamFinishedResponseHandler( CatchupClientProtocol protocol, CatchUpResponseHandler handler )
+    public TxStreamFinishedResponseHandler( CoreClientProtocol protocol, CoreResponseHandler handler )
     {
         this.protocol = protocol;
         this.handler = handler;

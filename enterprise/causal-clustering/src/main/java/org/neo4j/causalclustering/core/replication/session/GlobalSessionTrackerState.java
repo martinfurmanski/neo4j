@@ -47,10 +47,10 @@ public class GlobalSessionTrackerState
     /**
      * Tracks the operation and returns true iff this operation should be allowed.
      */
-    public boolean validateOperation( GlobalSession globalSession, LocalOperationId localOperationId )
+    public boolean validateOperation( GlobalSessionId globalSessionId, LocalOperationId localOperationId )
     {
-        LocalSessionTracker existingSessionTracker = sessionTrackers.get( globalSession.owner() );
-        if ( isNewSession( globalSession, existingSessionTracker ) )
+        LocalSessionTracker existingSessionTracker = sessionTrackers.get( globalSessionId.owner() );
+        if ( isNewSession( globalSessionId, existingSessionTracker ) )
         {
             return isFirstOperation( localOperationId );
         }
@@ -60,17 +60,17 @@ public class GlobalSessionTrackerState
         }
     }
 
-    public void update( GlobalSession globalSession, LocalOperationId localOperationId, long logIndex )
+    public void update( GlobalSessionId globalSessionId, LocalOperationId localOperationId, long logIndex )
     {
-        LocalSessionTracker localSessionTracker = validateGlobalSessionAndGetLocalSessionTracker( globalSession );
+        LocalSessionTracker localSessionTracker = validateGlobalSessionAndGetLocalSessionTracker( globalSessionId );
         localSessionTracker.validateAndTrackOperation( localOperationId );
         this.logIndex = logIndex;
     }
 
-    private boolean isNewSession( GlobalSession globalSession, LocalSessionTracker existingSessionTracker )
+    private boolean isNewSession( GlobalSessionId globalSessionId, LocalSessionTracker existingSessionTracker )
     {
         return existingSessionTracker == null ||
-                !existingSessionTracker.globalSessionId.equals( globalSession.sessionId() );
+                !existingSessionTracker.globalSessionId.equals( globalSessionId.sessionId() );
     }
 
     private boolean isFirstOperation( LocalOperationId id )
@@ -83,15 +83,15 @@ public class GlobalSessionTrackerState
         return logIndex;
     }
 
-    private LocalSessionTracker validateGlobalSessionAndGetLocalSessionTracker( GlobalSession globalSession )
+    private LocalSessionTracker validateGlobalSessionAndGetLocalSessionTracker( GlobalSessionId globalSessionId )
     {
-        LocalSessionTracker localSessionTracker = sessionTrackers.get( globalSession.owner() );
+        LocalSessionTracker localSessionTracker = sessionTrackers.get( globalSessionId.owner() );
 
         if ( localSessionTracker == null ||
-                !localSessionTracker.globalSessionId.equals( globalSession.sessionId() ) )
+                !localSessionTracker.globalSessionId.equals( globalSessionId.sessionId() ) )
         {
-            localSessionTracker = new LocalSessionTracker( globalSession.sessionId(), new HashMap<>() );
-            sessionTrackers.put( globalSession.owner(), localSessionTracker );
+            localSessionTracker = new LocalSessionTracker( globalSessionId.sessionId(), new HashMap<>() );
+            sessionTrackers.put( globalSessionId.owner(), localSessionTracker );
         }
 
         return localSessionTracker;

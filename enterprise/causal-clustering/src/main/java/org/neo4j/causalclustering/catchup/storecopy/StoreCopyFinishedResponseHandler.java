@@ -22,18 +22,18 @@ package org.neo4j.causalclustering.catchup.storecopy;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import org.neo4j.causalclustering.catchup.CatchUpResponseHandler;
-import org.neo4j.causalclustering.catchup.CatchupClientProtocol;
+import org.neo4j.causalclustering.catchup.CoreResponseHandler;
+import org.neo4j.causalclustering.catchup.CoreClientProtocol;
 
-import static org.neo4j.causalclustering.catchup.CatchupClientProtocol.State;
+import static org.neo4j.causalclustering.catchup.CoreClientProtocol.State;
 
 public class StoreCopyFinishedResponseHandler extends SimpleChannelInboundHandler<StoreCopyFinishedResponse>
 {
-    private final CatchupClientProtocol protocol;
-    private CatchUpResponseHandler handler;
+    private final CoreClientProtocol protocol;
+    private CoreResponseHandler handler;
 
-    public StoreCopyFinishedResponseHandler( CatchupClientProtocol protocol,
-                                             CatchUpResponseHandler handler )
+    public StoreCopyFinishedResponseHandler( CoreClientProtocol protocol,
+                                             CoreResponseHandler handler )
     {
         this.protocol = protocol;
         this.handler = handler;

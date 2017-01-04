@@ -22,15 +22,15 @@ package org.neo4j.causalclustering.catchup.storecopy;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import org.neo4j.causalclustering.catchup.CatchUpResponseHandler;
-import org.neo4j.causalclustering.catchup.CatchupClientProtocol;
+import org.neo4j.causalclustering.catchup.CoreResponseHandler;
+import org.neo4j.causalclustering.catchup.CoreClientProtocol;
 
 public class GetStoreIdResponseHandler extends SimpleChannelInboundHandler<GetStoreIdResponse>
 {
-    private final CatchUpResponseHandler handler;
-    private final CatchupClientProtocol protocol;
+    private final CoreResponseHandler handler;
+    private final CoreClientProtocol protocol;
 
-    public GetStoreIdResponseHandler( CatchupClientProtocol protocol, CatchUpResponseHandler handler )
+    public GetStoreIdResponseHandler( CoreClientProtocol protocol, CoreResponseHandler handler )
     {
         this.protocol = protocol;
         this.handler = handler;
@@ -40,6 +40,6 @@ public class GetStoreIdResponseHandler extends SimpleChannelInboundHandler<GetSt
     protected void channelRead0( ChannelHandlerContext ctx, final GetStoreIdResponse msg ) throws Exception
     {
         handler.onGetStoreIdResponse( msg );
-        protocol.expect( CatchupClientProtocol.State.MESSAGE_TYPE );
+        protocol.expect( CoreClientProtocol.State.MESSAGE_TYPE );
     }
 }

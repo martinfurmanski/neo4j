@@ -24,18 +24,18 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 import java.util.function.Supplier;
 
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol;
 import org.neo4j.causalclustering.catchup.ResponseMessageType;
 import org.neo4j.causalclustering.identity.StoreId;
 
-import static org.neo4j.causalclustering.catchup.CatchupServerProtocol.State;
+import static org.neo4j.causalclustering.catchup.CoreServerProtocol.State;
 
 public class GetStoreIdRequestHandler extends SimpleChannelInboundHandler<GetStoreIdRequest>
 {
-    private final CatchupServerProtocol protocol;
+    private final CoreServerProtocol protocol;
     private final Supplier<StoreId> storeIdSupplier;
 
-    public GetStoreIdRequestHandler( CatchupServerProtocol protocol, Supplier<StoreId> storeIdSupplier )
+    public GetStoreIdRequestHandler( CoreServerProtocol protocol, Supplier<StoreId> storeIdSupplier )
     {
         this.protocol = protocol;
         this.storeIdSupplier = storeIdSupplier;

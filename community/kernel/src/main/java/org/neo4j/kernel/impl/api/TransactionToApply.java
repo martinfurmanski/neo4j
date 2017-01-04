@@ -20,9 +20,11 @@
 package org.neo4j.kernel.impl.api;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.function.LongConsumer;
 
 import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.Commitment;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
@@ -61,6 +63,7 @@ public class TransactionToApply implements CommandsToApply, AutoCloseable
 
     // These fields are provided by user
     private final TransactionRepresentation transactionRepresentation;
+    private final Locks.Client locksClient;
     private long transactionId;
     private TransactionToApply nextTransactionInBatch;
 
@@ -77,14 +80,25 @@ public class TransactionToApply implements CommandsToApply, AutoCloseable
         this( transactionRepresentation, TRANSACTION_ID_NOT_SPECIFIED );
     }
 
+    public TransactionToApply( TransactionRepresentation transactionRepresentation, Locks.Client locksClient )
+    {
+        this( transactionRepresentation, TRANSACTION_ID_NOT_SPECIFIED, locksClient );
+    }
+
     /**
      * Used as convenience when committing a transaction that has already gotten a transaction id assigned,
      * i.e. when replicating a transaction.
      */
     public TransactionToApply( TransactionRepresentation transactionRepresentation, long transactionId )
     {
+        this( transactionRepresentation, transactionId, null );
+    }
+
+    public TransactionToApply( TransactionRepresentation transactionRepresentation, long transactionId, Locks.Client locksClient )
+    {
         this.transactionRepresentation = transactionRepresentation;
         this.transactionId = transactionId;
+        this.locksClient = locksClient;
     }
 
     // These methods are called by the user when building a batch
@@ -146,5 +160,10 @@ public class TransactionToApply implements CommandsToApply, AutoCloseable
         {
             closedCallback.accept( transactionId );
         }
+    }
+
+    public Optional<Locks.Client> locksClient()
+    {
+        return Optional.ofNullable( locksClient );
     }
 }

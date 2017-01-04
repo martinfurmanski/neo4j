@@ -25,6 +25,9 @@ import java.util.concurrent.Future;
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.consensus.NoLeaderFoundException;
 import org.neo4j.causalclustering.core.replication.Replicator;
+import org.neo4j.causalclustering.core.state.machines.locks.token.LockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransactionStateMachine;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.kernel.impl.locking.Locks;
@@ -60,7 +63,7 @@ import static org.neo4j.kernel.api.exceptions.Status.Transaction.Interrupted;
 // TODO: Fix lock exception usage when lock exception hierarchy has been fixed.
 public class LeaderOnlyLockManager implements Locks
 {
-    public static final String LOCK_NOT_ON_LEADER_ERROR_MESSAGE = "Should only attempt to take locks when leader.";
+    private static final String LOCK_NOT_ON_LEADER_ERROR_MESSAGE = "Should only attempt to take locks when leader.";
 
     private final MemberId myself;
 
@@ -100,8 +103,8 @@ public class LeaderOnlyLockManager implements Locks
            since only the leader should take locks. */
         ensureLeader();
 
-        ReplicatedLockTokenRequest lockTokenRequest =
-                new ReplicatedLockTokenRequest( myself, LockToken.nextCandidateId( currentToken.id() ) );
+        ReplicatedLockToken lockTokenRequest =
+                new ReplicatedLockToken( myself, LockToken.nextCandidateId( currentToken.id() ) );
 
         Future<Object> future;
         try
@@ -116,14 +119,14 @@ public class LeaderOnlyLockManager implements Locks
         try
         {
             boolean success = (boolean) future.get();
-            if( success )
+            if ( success )
             {
                 return lockTokenRequest.id();
             }
             else
             {
                 throw new AcquireLockTimeoutException( "Failed to acquire lock token. Was taken by another candidate.",
-                        NotALeader);
+                        NotALeader );
             }
         }
         catch ( ExecutionException e )

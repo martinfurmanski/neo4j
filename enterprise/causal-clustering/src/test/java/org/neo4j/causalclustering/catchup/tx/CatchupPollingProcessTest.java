@@ -27,8 +27,8 @@ import java.util.concurrent.CompletableFuture;
 
 import java.util.concurrent.Future;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchUpResponseCallback;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreClientResponseCallback;
 import org.neo4j.causalclustering.catchup.CatchupResult;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
@@ -63,7 +63,7 @@ import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.BASE_TX_I
 
 public class CatchupPollingProcessTest
 {
-    private final CatchUpClient catchUpClient = mock( CatchUpClient.class );
+    private final CoreClient coreClient = mock( CoreClient.class );
     private final CoreMemberSelectionStrategy serverSelection = mock( CoreMemberSelectionStrategy.class );
     private final MemberId coreMemberId = mock( MemberId.class );
     private final TransactionIdStore idStore = mock( TransactionIdStore.class );
@@ -84,7 +84,7 @@ public class CatchupPollingProcessTest
 
     private final CatchupPollingProcess txPuller =
             new CatchupPollingProcess( NullLogProvider.getInstance(), fs, localDatabase, startStopOnStoreCopy, storeFetcher,
-                    catchUpClient, serverSelection, timeoutService, txPullIntervalMillis, txApplier, new Monitors(),
+                    coreClient, serverSelection, timeoutService, txPullIntervalMillis, txApplier, new Monitors(),
                     copiedStoreRecovery, () -> mock( DatabaseHealth.class) );
 
     @Before
@@ -106,8 +106,8 @@ public class CatchupPollingProcessTest
         timeoutService.invokeTimeout( TX_PULLER_TIMEOUT );
 
         // then
-        verify( catchUpClient ).makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
-                any( CatchUpResponseCallback.class ) );
+        verify( coreClient ).makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
+                any( CoreClientResponseCallback.class ) );
     }
 
     @Test
@@ -119,15 +119,15 @@ public class CatchupPollingProcessTest
         when( txApplier.lastQueuedTxId() ).thenReturn( lastAppliedTxId );
 
         // when
-        when(catchUpClient.<CatchupResult>makeBlockingRequest(  any( MemberId.class ), any( TxPullRequest.class ),
-                any( CatchUpResponseCallback.class )  ))
+        when( coreClient.<CatchupResult>makeBlockingRequest(  any( MemberId.class ), any( TxPullRequest.class ),
+                any( CoreClientResponseCallback.class )  ))
                 .thenReturn( CatchupResult.SUCCESS_END_OF_BATCH, CatchupResult.SUCCESS_END_OF_STREAM );
 
         timeoutService.invokeTimeout( TX_PULLER_TIMEOUT );
 
         // then
-        verify( catchUpClient, times( 2 ) ).makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
-                any( CatchUpResponseCallback.class ) );
+        verify( coreClient, times( 2 ) ).makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
+                any( CoreClientResponseCallback.class ) );
     }
 
     @Test
@@ -135,8 +135,8 @@ public class CatchupPollingProcessTest
     {
         // when
         txPuller.start();
-        when( catchUpClient .makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
-                any(CatchUpResponseCallback.class)))
+        when( coreClient.makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
+                any(CoreClientResponseCallback.class)))
                 .thenReturn( CatchupResult.SUCCESS_END_OF_STREAM );
 
         timeoutService.invokeTimeout( TX_PULLER_TIMEOUT );
@@ -150,8 +150,8 @@ public class CatchupPollingProcessTest
     {
         // when
         txPuller.start();
-        when( catchUpClient.makeBlockingRequest(
-                any( MemberId.class ), any( TxPullRequest.class ), any( CatchUpResponseCallback.class ) ) )
+        when( coreClient.makeBlockingRequest(
+                any( MemberId.class ), any( TxPullRequest.class ), any( CoreClientResponseCallback.class ) ) )
                 .thenReturn( CatchupResult.E_TRANSACTION_PRUNED );
 
         timeoutService.invokeTimeout( TX_PULLER_TIMEOUT );
@@ -165,8 +165,8 @@ public class CatchupPollingProcessTest
     {
         // given
         txPuller.start();
-        when( catchUpClient.makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
-                any( CatchUpResponseCallback.class ) ) ).thenReturn( CatchupResult.E_TRANSACTION_PRUNED );
+        when( coreClient.makeBlockingRequest( any( MemberId.class ), any( TxPullRequest.class ),
+                any( CoreClientResponseCallback.class ) ) ).thenReturn( CatchupResult.E_TRANSACTION_PRUNED );
 
         // when (tx pull)
         timeoutService.invokeTimeout( TX_PULLER_TIMEOUT );
@@ -191,7 +191,7 @@ public class CatchupPollingProcessTest
     {
         // given
         txPuller.start();
-        CatchUpResponseCallback callback = mock( CatchUpResponseCallback.class );
+        CoreClientResponseCallback callback = mock( CoreClientResponseCallback.class );
 
         doThrow( new RuntimeException( "Panic all the things" ) ).when( callback )
                 .onTxPullResponse( any( CompletableFuture.class ), any( TxPullResponse.class ) );
@@ -208,8 +208,8 @@ public class CatchupPollingProcessTest
     public void shouldNotSignalOperationalUntilPulling() throws Throwable
     {
         // given
-        when(catchUpClient.<CatchupResult>makeBlockingRequest(  any( MemberId.class ), any( TxPullRequest.class ),
-                any( CatchUpResponseCallback.class )  ))
+        when( coreClient.<CatchupResult>makeBlockingRequest(  any( MemberId.class ), any( TxPullRequest.class ),
+                any( CoreClientResponseCallback.class )  ))
                 .thenReturn(
                         CatchupResult.E_TRANSACTION_PRUNED,
                         CatchupResult.SUCCESS_END_OF_BATCH,

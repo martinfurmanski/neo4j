@@ -24,7 +24,7 @@ import org.junit.Test;
 import java.util.UUID;
 
 import org.neo4j.causalclustering.core.consensus.ReplicatedInteger;
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.LocalOperationId;
 import org.neo4j.causalclustering.core.state.Result;
 
@@ -37,7 +37,7 @@ public class ProgressTrackerImplTest
 {
     private final int DEFAULT_TIMEOUT_MS = 15_000;
 
-    private GlobalSession session = new GlobalSession( UUID.randomUUID(), null );
+    private GlobalSessionId session = new GlobalSessionId( UUID.randomUUID(), null );
     private DistributedOperation operationA = new DistributedOperation(
             ReplicatedInteger.valueOf( 0 ), session, new LocalOperationId( 0, 0 ) );
     private DistributedOperation operationB = new DistributedOperation(
@@ -154,7 +154,7 @@ public class ProgressTrackerImplTest
     public void shouldIgnoreOtherSessions() throws Exception
     {
         // given
-        GlobalSession sessionB = new GlobalSession( UUID.randomUUID(), null );
+        GlobalSessionId sessionB = new GlobalSessionId( UUID.randomUUID(), null );
         DistributedOperation aliasUnderSessionB =
                 new DistributedOperation( ReplicatedInteger.valueOf( 0 ), sessionB,
                         new LocalOperationId(

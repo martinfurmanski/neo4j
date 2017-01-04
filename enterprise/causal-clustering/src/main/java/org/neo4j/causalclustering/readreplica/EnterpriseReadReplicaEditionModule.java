@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 
 import org.neo4j.backup.OnlineBackupKernelExtension;
 import org.neo4j.backup.OnlineBackupSettings;
-import org.neo4j.causalclustering.catchup.CatchUpClient;
+import org.neo4j.causalclustering.catchup.CoreClient;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
 import org.neo4j.causalclustering.catchup.storecopy.StoreCopyClient;
@@ -174,8 +174,8 @@ public class EnterpriseReadReplicaEditionModule extends EditionModule
                 logProvider, refreshReadReplicaTimeoutService, readReplicaTimeToLiveTimeout, readReplicaRefreshRate );
         life.add( dependencies.satisfyDependency( discoveryService ) );
 
-        long inactivityTimeoutMillis = config.get( CausalClusteringSettings.catch_up_client_inactivity_timeout );
-        CatchUpClient catchUpClient = life.add( new CatchUpClient( discoveryService, logProvider, Clocks.systemClock(),
+        long inactivityTimeoutMillis = config.get( CausalClusteringSettings.core_client_inactivity_timeout );
+        CoreClient coreClient = life.add( new CoreClient( discoveryService, logProvider, Clocks.systemClock(),
                 inactivityTimeoutMillis, monitors ) );
 
         final Supplier<DatabaseHealth> databaseHealthSupplier = dependencies.provideDependency( DatabaseHealth.class );
@@ -203,8 +203,8 @@ public class EnterpriseReadReplicaEditionModule extends EditionModule
 
         StoreFetcher storeFetcher = new StoreFetcher( platformModule.logging.getInternalLogProvider(),
                 fileSystem, platformModule.pageCache,
-                new StoreCopyClient( catchUpClient, logProvider ),
-                new TxPullClient( catchUpClient, platformModule.monitors ),
+                new StoreCopyClient( coreClient, logProvider ),
+                new TxPullClient( coreClient, platformModule.monitors ),
                 new TransactionLogCatchUpFactory(),
                 platformModule.monitors );
 
@@ -238,7 +238,7 @@ public class EnterpriseReadReplicaEditionModule extends EditionModule
 
         CatchupPollingProcess catchupProcess =
                 new CatchupPollingProcess( logProvider, fileSystem, localDatabase, servicesToStopOnStoreCopy, storeFetcher,
-                        catchUpClient, new ConnectToRandomCoreMember( discoveryService ), catchupTimeoutService,
+                        coreClient, new ConnectToRandomCoreMember( discoveryService ), catchupTimeoutService,
                         config.get( CausalClusteringSettings.pull_interval ), batchingTxApplier,
                         platformModule.monitors, copiedStoreRecovery, databaseHealthSupplier );
 

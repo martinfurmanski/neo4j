@@ -21,9 +21,9 @@ package org.neo4j.causalclustering.catchup.storecopy;
 
 import org.neo4j.causalclustering.catchup.RequestMessageType;
 import org.neo4j.causalclustering.identity.StoreId;
-import org.neo4j.causalclustering.messaging.CatchUpRequest;
+import org.neo4j.causalclustering.messaging.CoreRequest;
 
-public class GetStoreRequest implements CatchUpRequest
+public class GetStoreRequest implements CoreRequest
 {
     private final StoreId expectedStoreId;
 
@@ -41,5 +41,13 @@ public class GetStoreRequest implements CatchUpRequest
     StoreId expectedStoreId()
     {
         return expectedStoreId;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "GetStoreRequest{" +
+               "expectedStoreId=" + expectedStoreId +
+               '}';
     }
 }

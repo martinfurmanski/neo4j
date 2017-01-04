@@ -30,7 +30,7 @@ import org.neo4j.causalclustering.SessionTracker;
 import org.neo4j.causalclustering.core.replication.DistributedOperation;
 import org.neo4j.causalclustering.core.replication.ProgressTrackerImpl;
 import org.neo4j.causalclustering.core.replication.ReplicatedContent;
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerState;
 import org.neo4j.causalclustering.core.replication.session.LocalOperationId;
 import org.neo4j.causalclustering.core.state.machines.CoreStateMachines;
@@ -75,7 +75,7 @@ public class CommandApplicationProcessTest
     private final DatabaseHealth dbHealth = new DatabaseHealth( mock( DatabasePanicEventGenerator.class ),
             NullLogProvider.getInstance().getLog( getClass() ) );
 
-    private final GlobalSession globalSession = new GlobalSession( UUID.randomUUID(), null );
+    private final GlobalSessionId globalSessionId = new GlobalSessionId( UUID.randomUUID(), null );
     private final int flushEvery = 10;
     private final int batchSize = 16;
 
@@ -85,7 +85,7 @@ public class CommandApplicationProcessTest
     private final CoreStateMachines coreStateMachines = mock( CoreStateMachines.class );
     private final CommandApplicationProcess applicationProcess = new CommandApplicationProcess(
             coreStateMachines, raftLog, batchSize, flushEvery, () -> dbHealth,
-            NullLogProvider.getInstance(), new ProgressTrackerImpl( globalSession ), lastFlushedStorage,
+            NullLogProvider.getInstance(), new ProgressTrackerImpl( globalSessionId ), lastFlushedStorage,
             sessionStorage, applier, inFlightMap, monitors );
 
     private ReplicatedTransaction nullTx = new ReplicatedTransaction( null );
@@ -107,7 +107,7 @@ public class CommandApplicationProcessTest
     private int sequenceNumber = 0;
     private synchronized ReplicatedContent operation( CoreReplicatedContent tx )
     {
-        return new DistributedOperation( tx, globalSession, new LocalOperationId( 0, sequenceNumber++ ) );
+        return new DistributedOperation( tx, globalSessionId, new LocalOperationId( 0, sequenceNumber++ ) );
     }
 
     @Test
@@ -181,9 +181,9 @@ public class CommandApplicationProcessTest
 
         // when
         raftLog.append( new RaftLogEntry( 0, new NewLeaderBarrier() ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSession, new LocalOperationId( 0, 0 ) ) ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSession, new LocalOperationId( 0, 0 ) ) ) ); // duplicate
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSession, new LocalOperationId( 0, 1 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSessionId, new LocalOperationId( 0, 0 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSessionId, new LocalOperationId( 0, 0 ) ) ) ); // duplicate
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( nullTx, globalSessionId, new LocalOperationId( 0, 1 ) ) ) );
 
         applicationProcess.notifyCommitted( 3 );
         applier.sync( false );
@@ -206,13 +206,13 @@ public class CommandApplicationProcessTest
         applicationProcess.start();
 
         // when
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 100 ), globalSession, new LocalOperationId( 0, 0 ) ) ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 101 ), globalSession, new LocalOperationId( 0, 1 ) ) ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 102 ), globalSession, new LocalOperationId( 0, 2 ) ) ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 101 ), globalSession, new LocalOperationId( 0, 1 ) ) ) ); // duplicate of tx 101
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 100 ), globalSession, new LocalOperationId( 0, 0 ) ) ) ); // duplicate of tx 100
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 103 ), globalSession, new LocalOperationId( 0, 3 ) ) ) );
-        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 104 ), globalSession, new LocalOperationId( 0, 4 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 100 ), globalSessionId, new LocalOperationId( 0, 0 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 101 ), globalSessionId, new LocalOperationId( 0, 1 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 102 ), globalSessionId, new LocalOperationId( 0, 2 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 101 ), globalSessionId, new LocalOperationId( 0, 1 ) ) ) ); // duplicate of tx 101
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 100 ), globalSessionId, new LocalOperationId( 0, 0 ) ) ) ); // duplicate of tx 100
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 103 ), globalSessionId, new LocalOperationId( 0, 3 ) ) ) );
+        raftLog.append( new RaftLogEntry( 0, new DistributedOperation( tx( (byte) 104 ), globalSessionId, new LocalOperationId( 0, 4 ) ) ) );
 
         applicationProcess.notifyCommitted( 6 );
         applier.sync( false );

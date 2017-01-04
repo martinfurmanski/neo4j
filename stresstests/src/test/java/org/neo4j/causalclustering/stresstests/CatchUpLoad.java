@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 
 import org.neo4j.helper.IsConnectionRestByPeer;
 import org.neo4j.helper.IsStoreClosed;
-import org.neo4j.causalclustering.catchup.CatchUpClient;
+import org.neo4j.causalclustering.catchup.CoreClient;
 import org.neo4j.causalclustering.discovery.Cluster;
 import org.neo4j.causalclustering.discovery.ClusterMember;
 import org.neo4j.causalclustering.discovery.ReadReplica;
@@ -130,7 +130,7 @@ class CatchUpLoad extends RepeatUntilCallable
         final Monitors monitors =
                 readReplica.database().getDependencyResolver().resolveDependency( Monitors.class );
         ExceptionMonitor exceptionMonitor = new ExceptionMonitor( new IsConnectionRestByPeer() );
-        monitors.addMonitorListener( exceptionMonitor, CatchUpClient.class.getName() );
+        monitors.addMonitorListener( exceptionMonitor, CoreClient.class.getName() );
         return exceptionMonitor;
     }
 

@@ -29,8 +29,8 @@ import org.neo4j.causalclustering.core.state.CommandDispatcher;
 import org.neo4j.causalclustering.core.state.Result;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdAllocationRequest;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdAllocationStateMachine;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedTokenRequest;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedTokenStateMachine;
 import org.neo4j.causalclustering.core.state.machines.token.TokenType;
@@ -178,7 +178,7 @@ public class CoreStateMachinesTest
     }
 
     @SuppressWarnings( "unchecked" )
-    private final ReplicatedLockTokenRequest lockTokenRequest = mock( ReplicatedLockTokenRequest.class );
+    private final ReplicatedLockToken lockTokenRequest = mock( ReplicatedLockToken.class );
 
     @SuppressWarnings( "unchecked" )
     private final Consumer<Result> callback = mock( Consumer.class );

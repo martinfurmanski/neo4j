@@ -41,23 +41,17 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import org.neo4j.causalclustering.core.CoreGraphDatabase;
-import org.neo4j.causalclustering.core.LeaderCanWrite;
-import org.neo4j.causalclustering.core.consensus.NoLeaderFoundException;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
-import org.neo4j.causalclustering.core.state.machines.id.IdGenerationException;
-import org.neo4j.causalclustering.core.state.machines.locks.LeaderOnlyLockManager;
 import org.neo4j.causalclustering.readreplica.ReadReplicaGraphDatabase;
 import org.neo4j.function.ThrowingSupplier;
 import org.neo4j.graphdb.DatabaseShutdownException;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.graphdb.TransactionFailureException;
-import org.neo4j.graphdb.security.WriteOperationsNotAllowedException;
 import org.neo4j.helpers.AdvertisedSocketAddress;
 import org.neo4j.helpers.NamedThreadFactory;
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.impl.store.format.standard.StandardV3_0;
 import org.neo4j.kernel.internal.DatabaseHealth;
 import org.neo4j.kernel.monitoring.Monitors;
-import org.neo4j.storageengine.api.lock.AcquireLockTimeoutException;
 import org.neo4j.test.DbRepresentation;
 
 import static java.util.Collections.emptyMap;
@@ -69,7 +63,7 @@ import static org.neo4j.function.Predicates.awaitEx;
 import static org.neo4j.function.Predicates.notNull;
 import static org.neo4j.helpers.collection.Iterables.firstOrNull;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.api.exceptions.Status.Transaction.LockSessionExpired;
+import static org.neo4j.kernel.api.exceptions.Status.Classification.TransientError;
 
 public class Cluster
 {
@@ -364,32 +358,17 @@ public class Cluster
 
     private boolean isTransientFailure( Throwable e )
     {
-        // TODO: This should really catch all cases of transient failures. Must be able to express that in a clearer
-        // manner...
-        return (e instanceof IdGenerationException) || isLockExpired( e ) || isLockOnFollower( e ) ||
-                isWriteNotOnLeader( e );
+        do
+        {
+            if ( e instanceof Status.HasStatus )
+            {
+                return ((Status.HasStatus) e).status().code().classification() == TransientError;
+            }
+            e = e.getCause();
+        }
+        while ( e != null );
 
-    }
-
-    private boolean isWriteNotOnLeader( Throwable e )
-    {
-        return e instanceof WriteOperationsNotAllowedException &&
-                e.getMessage().startsWith( String.format( LeaderCanWrite.NOT_LEADER_ERROR_MSG, "" ) );
-    }
-
-    private boolean isLockOnFollower( Throwable e )
-    {
-        return e instanceof AcquireLockTimeoutException &&
-                (e.getMessage().equals( LeaderOnlyLockManager.LOCK_NOT_ON_LEADER_ERROR_MESSAGE ) ||
-                        e.getCause() instanceof NoLeaderFoundException);
-    }
-
-    private boolean isLockExpired( Throwable e )
-    {
-        return e instanceof TransactionFailureException &&
-                e.getCause() instanceof org.neo4j.kernel.api.exceptions.TransactionFailureException &&
-                ((org.neo4j.kernel.api.exceptions.TransactionFailureException) e.getCause()).status() ==
-                        LockSessionExpired;
+        return false;
     }
 
     public static List<AdvertisedSocketAddress> buildAddresses( Set<Integer> coreServerIds )

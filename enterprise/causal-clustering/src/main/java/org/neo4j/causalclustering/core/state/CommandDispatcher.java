@@ -24,7 +24,7 @@ import java.util.function.Consumer;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdAllocationRequest;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedTokenRequest;
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransaction;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
 
 public interface CommandDispatcher extends AutoCloseable
 {
@@ -34,7 +34,7 @@ public interface CommandDispatcher extends AutoCloseable
 
     void dispatch( ReplicatedTokenRequest tokenRequest, long commandIndex, Consumer<Result> callback );
 
-    void dispatch( ReplicatedLockTokenRequest lockRequest, long commandIndex, Consumer<Result> callback );
+    void dispatch( ReplicatedLockToken lockRequest, long commandIndex, Consumer<Result> callback );
 
     @Override
     void close();

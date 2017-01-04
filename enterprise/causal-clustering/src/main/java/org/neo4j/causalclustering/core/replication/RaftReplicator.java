@@ -20,16 +20,18 @@
 package org.neo4j.causalclustering.core.replication;
 
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.consensus.NoLeaderFoundException;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
-import org.neo4j.causalclustering.messaging.Outbound;
 import org.neo4j.causalclustering.core.replication.session.LocalSessionPool;
 import org.neo4j.causalclustering.core.replication.session.OperationContext;
 import org.neo4j.causalclustering.core.state.machines.tx.RetryStrategy;
 import org.neo4j.causalclustering.identity.MemberId;
+import org.neo4j.causalclustering.messaging.Outbound;
 import org.neo4j.kernel.impl.util.Listener;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
@@ -69,11 +71,16 @@ public class RaftReplicator extends LifecycleAdapter implements Replicator, List
     }
 
     @Override
-    public Future<Object> replicate( ReplicatedContent command, boolean trackResult ) throws InterruptedException
+    public Future<Object> replicate( ReplicatedContent content, boolean trackResult ) throws InterruptedException
     {
         OperationContext session = sessionPool.acquireSession();
+        return replicate( content, trackResult, session );
+    }
 
-        DistributedOperation operation = new DistributedOperation( command, session.globalSession(), session.localOperationId() );
+    @Override
+    public Future<Object> replicate( ReplicatedContent command, boolean trackResult, OperationContext session ) throws InterruptedException
+    {
+        DistributedOperation operation = new DistributedOperation( command, session.globalSessionId(), session.localOperationId() );
         Progress progress = progressTracker.start( operation );
 
         RetryStrategy.Timeout timeout = retryStrategy.newTimeout();
@@ -95,7 +102,7 @@ public class RaftReplicator extends LifecycleAdapter implements Replicator, List
 
         BiConsumer<Object,Throwable> cleanup = ( ignored1, ignored2 ) -> sessionPool.releaseSession( session );
 
-        if( trackResult )
+        if ( trackResult )
         {
             progress.futureResult().whenComplete( cleanup );
         }
@@ -105,6 +112,12 @@ public class RaftReplicator extends LifecycleAdapter implements Replicator, List
         }
 
         return progress.futureResult();
+    }
+
+    @Override
+    public void await( long dataVersion, long timeoutMs, TimeUnit timeUnit ) throws TimeoutException
+    {
+        throw new UnsupportedOperationException( "TODO" ); // TODO
     }
 
     @Override

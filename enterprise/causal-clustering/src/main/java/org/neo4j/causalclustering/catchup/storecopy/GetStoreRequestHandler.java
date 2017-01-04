@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol;
 import org.neo4j.causalclustering.catchup.ResponseMessageType;
 import org.neo4j.causalclustering.catchup.storecopy.StoreCopyFinishedResponse.Status;
 import org.neo4j.graphdb.ResourceIterator;
@@ -37,19 +37,19 @@ import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.storageengine.api.StoreFileMetadata;
 
-import static org.neo4j.causalclustering.catchup.CatchupServerProtocol.State;
+import static org.neo4j.causalclustering.catchup.CoreServerProtocol.State;
 import static org.neo4j.causalclustering.catchup.storecopy.StoreCopyFinishedResponse.Status.SUCCESS;
 import static org.neo4j.io.fs.FileUtils.relativePath;
 
 public class GetStoreRequestHandler extends SimpleChannelInboundHandler<GetStoreRequest>
 {
-    private final CatchupServerProtocol protocol;
+    private final CoreServerProtocol protocol;
     private final Supplier<NeoStoreDataSource> dataSource;
     private final Supplier<CheckPointer> checkPointerSupplier;
     private final FileSystemAbstraction fs;
     private final Log log;
 
-    public GetStoreRequestHandler( CatchupServerProtocol protocol, Supplier<NeoStoreDataSource> dataSource,
+    public GetStoreRequestHandler( CoreServerProtocol protocol, Supplier<NeoStoreDataSource> dataSource,
                                    Supplier<CheckPointer> checkPointerSupplier, FileSystemAbstraction fs,
                                    LogProvider logProvider )
     {

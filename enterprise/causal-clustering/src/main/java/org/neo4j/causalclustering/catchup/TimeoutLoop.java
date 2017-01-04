@@ -27,10 +27,12 @@ import java.util.function.Supplier;
 
 import org.neo4j.logging.Log;
 
+import static java.lang.String.format;
+
 class TimeoutLoop
 {
     static <T> T waitForCompletion( Future<T> future, String operation, Supplier<Long> millisSinceLastResponseSupplier,
-                                    long inactivityTimeoutMillis, Log log ) throws CatchUpClientException
+            long inactivityTimeoutMillis, Log log ) throws CoreCommunicationException
     {
         long remainingTimeoutMillis = inactivityTimeoutMillis;
         while ( true )
@@ -42,11 +44,13 @@ class TimeoutLoop
             catch ( InterruptedException e )
             {
                 Thread.interrupted();
-                throw exception( future, operation, e );
+                String message = format( "Operation %s interrupted", operation );
+                throw loggedException( future, log, message, e );
             }
             catch ( ExecutionException e )
             {
-                throw exception( future, operation, e );
+                String message = format( "Operation %s failed", operation );
+                throw loggedException( future, log, message, e );
             }
             catch ( TimeoutException e )
             {
@@ -57,16 +61,18 @@ class TimeoutLoop
                 }
                 else
                 {
-                    log.info( "Request timed out. Time since last response: " + millisSinceLastResponse );
-                    throw exception( future, operation, e );
+                    String message = format( "Operation %s timed out. Time since last response: %d",
+                            operation, millisSinceLastResponse );
+                    throw loggedException( future, log, message, e );
                 }
             }
         }
     }
 
-    private static CatchUpClientException exception( Future<?> future, String operation, Exception e )
+    private static CoreCommunicationException loggedException( Future<?> future, Log log, String message, Exception e )
     {
+        log.info( message );
         future.cancel( true );
-        return new CatchUpClientException( operation, e );
+        return new CoreCommunicationException( message, e );
     }
 }

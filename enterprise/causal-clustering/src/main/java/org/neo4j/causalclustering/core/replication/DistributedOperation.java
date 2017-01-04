@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import org.neo4j.causalclustering.messaging.CoreReplicatedContentMarshal;
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.LocalOperationId;
 import org.neo4j.causalclustering.messaging.EndOfStreamException;
 import org.neo4j.causalclustering.identity.MemberId;
@@ -33,22 +33,22 @@ import org.neo4j.storageengine.api.WritableChannel;
 /**
  * A uniquely identifiable operation.
  */
-public class  DistributedOperation implements ReplicatedContent
+public class DistributedOperation implements ReplicatedContent
 {
     private final ReplicatedContent content;
-    private final GlobalSession globalSession;
+    private final GlobalSessionId globalSessionId;
     private final LocalOperationId operationId;
 
-    public DistributedOperation( ReplicatedContent content, GlobalSession globalSession, LocalOperationId operationId )
+    public DistributedOperation( ReplicatedContent content, GlobalSessionId globalSessionId, LocalOperationId operationId )
     {
         this.content = content;
-        this.globalSession = globalSession;
+        this.globalSessionId = globalSessionId;
         this.operationId = operationId;
     }
 
-    public GlobalSession globalSession()
+    public GlobalSessionId globalSession()
     {
-        return globalSession;
+        return globalSessionId;
     }
 
     public LocalOperationId operationId()
@@ -78,14 +78,14 @@ public class  DistributedOperation implements ReplicatedContent
         long mostSigBits = channel.getLong();
         long leastSigBits = channel.getLong();
         MemberId owner = new MemberId.Marshal().unmarshal( channel );
-        GlobalSession globalSession = new GlobalSession( new UUID( mostSigBits, leastSigBits ), owner );
+        GlobalSessionId globalSessionId = new GlobalSessionId( new UUID( mostSigBits, leastSigBits ), owner );
 
         long localSessionId = channel.getLong();
         long sequenceNumber = channel.getLong();
         LocalOperationId localOperationId = new LocalOperationId( localSessionId, sequenceNumber );
 
         ReplicatedContent content = new CoreReplicatedContentMarshal().unmarshal( channel );
-        return new DistributedOperation( content, globalSession, localOperationId );
+        return new DistributedOperation( content, globalSessionId, localOperationId );
     }
 
     @Override
@@ -93,7 +93,7 @@ public class  DistributedOperation implements ReplicatedContent
     {
         return "DistributedOperation{" +
                "content=" + content +
-               ", globalSession=" + globalSession +
+               ", globalSession=" + globalSessionId +
                ", operationId=" + operationId +
                '}';
     }

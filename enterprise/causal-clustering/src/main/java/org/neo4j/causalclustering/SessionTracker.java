@@ -21,7 +21,7 @@ package org.neo4j.causalclustering;
 
 import java.io.IOException;
 
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerState;
 import org.neo4j.causalclustering.core.replication.session.LocalOperationId;
 import org.neo4j.causalclustering.core.state.storage.StateStorage;
@@ -64,14 +64,14 @@ public class SessionTracker
         this.sessionState = sessionState;
     }
 
-    public boolean validateOperation( GlobalSession globalSession, LocalOperationId localOperationId )
+    public boolean validateOperation( GlobalSessionId globalSessionId, LocalOperationId localOperationId )
     {
-        return sessionState.validateOperation( globalSession, localOperationId );
+        return sessionState.validateOperation( globalSessionId, localOperationId );
     }
 
-    public void update( GlobalSession globalSession, LocalOperationId localOperationId, long logIndex )
+    public void update( GlobalSessionId globalSessionId, LocalOperationId localOperationId, long logIndex )
     {
-        sessionState.update( globalSession, localOperationId, logIndex );
+        sessionState.update( globalSessionId, localOperationId, logIndex );
     }
 
     public GlobalSessionTrackerState newInstance()

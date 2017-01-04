@@ -22,7 +22,7 @@ package org.neo4j.causalclustering.catchup.storecopy;
 import java.io.File;
 import java.io.IOException;
 
-import org.neo4j.causalclustering.catchup.CatchUpClientException;
+import org.neo4j.causalclustering.catchup.CoreCommunicationException;
 import org.neo4j.causalclustering.catchup.CatchupResult;
 import org.neo4j.causalclustering.catchup.TxPullRequestResult;
 import org.neo4j.causalclustering.catchup.tx.TransactionLogCatchUpFactory;
@@ -115,7 +115,7 @@ public class StoreFetcher
 
             return lastStatus;
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             throw new StoreCopyFailedException( e );
         }

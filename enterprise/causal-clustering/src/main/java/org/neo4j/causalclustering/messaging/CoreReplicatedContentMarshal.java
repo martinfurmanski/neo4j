@@ -21,7 +21,7 @@ package org.neo4j.causalclustering.messaging;
 
 import java.io.IOException;
 
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenSerializer;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenSerializer;
 import org.neo4j.causalclustering.core.consensus.NewLeaderBarrier;
 import org.neo4j.causalclustering.core.consensus.membership.MemberIdSet;
 import org.neo4j.causalclustering.core.consensus.membership.MemberIdSetSerializer;
@@ -34,7 +34,7 @@ import org.neo4j.causalclustering.core.state.machines.token.ReplicatedTokenReque
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransaction;
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransactionSerializer;
 import org.neo4j.causalclustering.core.state.storage.SafeChannelMarshal;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
@@ -75,10 +75,10 @@ public class CoreReplicatedContentMarshal extends SafeChannelMarshal<ReplicatedC
         {
             channel.put( NEW_LEADER_BARRIER_TYPE );
         }
-        else if( content instanceof ReplicatedLockTokenRequest )
+        else if( content instanceof ReplicatedLockToken )
         {
             channel.put( LOCK_TOKEN_REQUEST );
-            ReplicatedLockTokenSerializer.marshal( (ReplicatedLockTokenRequest) content, channel );
+            ReplicatedLockTokenSerializer.marshal( (ReplicatedLockToken) content, channel );
         }
         else if( content instanceof DistributedOperation )
         {

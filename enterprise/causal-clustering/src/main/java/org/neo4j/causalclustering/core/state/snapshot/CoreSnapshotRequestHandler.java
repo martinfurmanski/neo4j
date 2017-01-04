@@ -24,18 +24,18 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 import java.io.IOException;
 
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol;
 import org.neo4j.causalclustering.catchup.ResponseMessageType;
 import org.neo4j.causalclustering.core.state.CoreState;
 
-import static org.neo4j.causalclustering.catchup.CatchupServerProtocol.State;
+import static org.neo4j.causalclustering.catchup.CoreServerProtocol.State;
 
 public class CoreSnapshotRequestHandler extends SimpleChannelInboundHandler<CoreSnapshotRequest>
 {
-    private final CatchupServerProtocol protocol;
+    private final CoreServerProtocol protocol;
     private final CoreState coreState;
 
-    public CoreSnapshotRequestHandler( CatchupServerProtocol protocol, CoreState coreState )
+    public CoreSnapshotRequestHandler( CoreServerProtocol protocol, CoreState coreState )
     {
         this.protocol = protocol;
         this.coreState = coreState;

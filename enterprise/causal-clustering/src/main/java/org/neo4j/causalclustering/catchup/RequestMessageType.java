@@ -25,10 +25,20 @@ import static java.lang.String.format;
 
 public enum RequestMessageType implements Message
 {
+    // catchup related
     TX_PULL_REQUEST( (byte) 1 ),
     STORE( (byte) 2 ),
     CORE_SNAPSHOT( (byte) 3 ),
     STORE_ID( (byte) 4 ),
+
+    // locking related
+    REGISTER_LOCK_SESSION( (byte) 101 ),
+    STOP_LOCK_SESSION( (byte) 102 ),
+    END_LOCK_SESSION( (byte) 103 ),
+
+    ACQUIRE_LOCKS( (byte) 110 ),
+    RELEASE_LOCK( (byte) 111 ),
+
     UNKNOWN( (byte) 404 );
 
     private byte messageType;

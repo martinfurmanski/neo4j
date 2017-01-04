@@ -25,13 +25,11 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 
 import java.util.List;
 
-import org.neo4j.causalclustering.messaging.NetworkReadableClosableChannelNetty4;
-
 public class CoreSnapshotDecoder extends ByteToMessageDecoder
 {
     @Override
     protected void decode( ChannelHandlerContext ctx, ByteBuf msg, List<Object> out ) throws Exception
     {
-        out.add( new CoreSnapshot.Marshal().unmarshal( new NetworkReadableClosableChannelNetty4( msg ) ) );
+        out.add( new CoreSnapshot.Marshal().unmarshal( msg ) );
     }
 }

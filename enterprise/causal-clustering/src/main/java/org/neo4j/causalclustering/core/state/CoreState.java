@@ -65,6 +65,7 @@ public class CoreState implements MessageHandler<RaftMessages.ClusterIdAwareMess
         this.applicationProcess = commandApplicationProcess;
     }
 
+    @Override
     public synchronized void handle( RaftMessages.ClusterIdAwareMessage clusterIdAwareMessage )
     {
         if ( !allowMessageHandling )
@@ -73,31 +74,39 @@ public class CoreState implements MessageHandler<RaftMessages.ClusterIdAwareMess
         }
 
         ClusterId clusterId = clusterIdAwareMessage.clusterId();
+        RaftMessages.RaftMessage message = clusterIdAwareMessage.message();
+
         if ( clusterId.equals( clusterIdentity.clusterId() ) )
         {
-            try
-            {
-                ConsensusOutcome outcome = raftMachine.handle( clusterIdAwareMessage.message() );
-                if ( outcome.needsFreshSnapshot() )
-                {
-                    downloadSnapshot( clusterIdAwareMessage.message().from() );
-                }
-                else
-                {
-                    notifyCommitted( outcome.getCommitIndex() );
-                }
-            }
-            catch ( Throwable e )
-            {
-                log.error( "Error handling message", e );
-                raftMachine.panic();
-                localDatabase.panic( e );
-            }
+            handleMessage( message );
         }
         else
         {
-            log.info( "Discarding message[%s] owing to mismatched storeId. Expected: %s, Encountered: %s",
-                    clusterIdAwareMessage.message(), clusterId, clusterIdentity.clusterId() );
+            log.info( "Discarding message[%s] owing to mismatched clusterId. Expected: %s, Encountered: %s",
+                    message, clusterId, clusterIdentity.clusterId() );
+        }
+    }
+
+    private void handleMessage( RaftMessages.RaftMessage message )
+    {
+        try
+        {
+            ConsensusOutcome outcome = raftMachine.handle( message );
+
+            if ( outcome.needsFreshSnapshot() )
+            {
+                downloadSnapshot( message.from() );
+            }
+            else
+            {
+                notifyCommitted( outcome.getCommitIndex() );
+            }
+        }
+        catch ( Throwable e )
+        {
+            log.error( "Error handling message", e );
+            raftMachine.panic();
+            localDatabase.panic( e );
         }
     }
 

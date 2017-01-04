@@ -22,24 +22,24 @@ package org.neo4j.causalclustering.core.replication;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.LocalOperationId;
 import org.neo4j.causalclustering.core.state.Result;
 
 public class ProgressTrackerImpl implements ProgressTracker
 {
     private final Map<LocalOperationId,Progress> tracker = new ConcurrentHashMap<>();
-    private final GlobalSession myGlobalSession;
+    private final GlobalSessionId myGlobalSessionId;
 
-    public ProgressTrackerImpl( GlobalSession myGlobalSession )
+    public ProgressTrackerImpl( GlobalSessionId myGlobalSessionId )
     {
-        this.myGlobalSession = myGlobalSession;
+        this.myGlobalSessionId = myGlobalSessionId;
     }
 
     @Override
     public Progress start( DistributedOperation operation )
     {
-        assert operation.globalSession().equals( myGlobalSession );
+        assert operation.globalSession().equals( myGlobalSessionId );
 
         Progress progress = new Progress();
         tracker.put( operation.operationId(), progress );
@@ -49,7 +49,7 @@ public class ProgressTrackerImpl implements ProgressTracker
     @Override
     public void trackReplication( DistributedOperation operation )
     {
-        if( !operation.globalSession().equals( myGlobalSession ) )
+        if( !operation.globalSession().equals( myGlobalSessionId ) )
         {
             return;
         }
@@ -64,7 +64,7 @@ public class ProgressTrackerImpl implements ProgressTracker
     @Override
     public void trackResult( DistributedOperation operation, Result result )
     {
-        if( !operation.globalSession().equals( myGlobalSession ) )
+        if( !operation.globalSession().equals( myGlobalSessionId ) )
         {
             return;
         }

@@ -21,8 +21,8 @@ package org.neo4j.causalclustering.core.state.snapshot;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchUpResponseAdaptor;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreClientResponseAdaptor;
 import org.neo4j.causalclustering.catchup.CatchupResult;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
@@ -46,19 +46,19 @@ public class CoreStateDownloader
     private final LocalDatabase localDatabase;
     private final Lifecycle startStopOnStoreCopy;
     private final StoreFetcher storeFetcher;
-    private final CatchUpClient catchUpClient;
+    private final CoreClient coreClient;
     private final Log log;
     private final CopiedStoreRecovery copiedStoreRecovery;
 
     public CoreStateDownloader( FileSystemAbstraction fs, LocalDatabase localDatabase, Lifecycle startStopOnStoreCopy,
-            StoreFetcher storeFetcher, CatchUpClient catchUpClient, LogProvider logProvider,
+            StoreFetcher storeFetcher, CoreClient coreClient, LogProvider logProvider,
             CopiedStoreRecovery copiedStoreRecovery )
     {
         this.fs = fs;
         this.localDatabase = localDatabase;
         this.startStopOnStoreCopy = startStopOnStoreCopy;
         this.storeFetcher = storeFetcher;
-        this.catchUpClient = catchUpClient;
+        this.coreClient = coreClient;
         this.log = logProvider.getLog( getClass() );
         this.copiedStoreRecovery = copiedStoreRecovery;
     }
@@ -89,8 +89,8 @@ public class CoreStateDownloader
              * are ahead, and the correct decisions for their applicability have already been taken as encapsulated
              * in the copied store. */
 
-            CoreSnapshot coreSnapshot = catchUpClient.makeBlockingRequest( source, new CoreSnapshotRequest(),
-                    new CatchUpResponseAdaptor<CoreSnapshot>()
+            CoreSnapshot coreSnapshot = coreClient.makeBlockingRequest( source, new CoreSnapshotRequest(),
+                    new CoreClientResponseAdaptor<CoreSnapshot>()
                     {
                         @Override
                         public void onCoreSnapshot( CompletableFuture<CoreSnapshot> signal, CoreSnapshot response )

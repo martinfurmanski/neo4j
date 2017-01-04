@@ -20,16 +20,14 @@
 package org.neo4j.causalclustering;
 
 import java.io.File;
-import java.util.UUID;
 
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
+import org.neo4j.causalclustering.identity.IdentityModule;
 import org.neo4j.causalclustering.core.consensus.ConsensusModule;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.replication.ProgressTrackerImpl;
 import org.neo4j.causalclustering.core.replication.RaftReplicator;
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
 import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerState;
-import org.neo4j.causalclustering.core.replication.session.LocalSessionPool;
 import org.neo4j.causalclustering.core.state.machines.tx.ExponentialBackoffStrategy;
 import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
 import org.neo4j.causalclustering.identity.MemberId;
@@ -50,7 +48,7 @@ public class ReplicationModule
     private final ProgressTrackerImpl progressTracker;
     private final SessionTracker sessionTracker;
 
-    public ReplicationModule( MemberId myself, PlatformModule platformModule, Config config,
+    public ReplicationModule( IdentityModule identityModule, PlatformModule platformModule, Config config,
             ConsensusModule consensusModule, Outbound<MemberId,RaftMessages.RaftMessage> outbound,
             File clusterStateDirectory, FileSystemAbstraction fileSystem, LogProvider logProvider )
     {
@@ -63,11 +61,9 @@ public class ReplicationModule
 
         sessionTracker = new SessionTracker( sessionTrackerStorage );
 
-        GlobalSession myGlobalSession = new GlobalSession( UUID.randomUUID(), myself );
-        LocalSessionPool sessionPool = new LocalSessionPool( myGlobalSession );
-        progressTracker = new ProgressTrackerImpl( myGlobalSession );
+        progressTracker = new ProgressTrackerImpl( identityModule.myGlobalSession() );
 
-        replicator = life.add( new RaftReplicator( consensusModule.raftMachine(), myself, outbound, sessionPool,
+        replicator = life.add( new RaftReplicator( consensusModule.raftMachine(), identityModule.myIdentity(), outbound, identityModule.sessionPool(),
             progressTracker, new ExponentialBackoffStrategy( 10, SECONDS ) ) );
 
     }

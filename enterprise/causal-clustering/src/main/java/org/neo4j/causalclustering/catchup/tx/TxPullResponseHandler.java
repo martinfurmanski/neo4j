@@ -22,16 +22,16 @@ package org.neo4j.causalclustering.catchup.tx;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import org.neo4j.causalclustering.catchup.CatchUpResponseHandler;
-import org.neo4j.causalclustering.catchup.CatchupClientProtocol;
+import org.neo4j.causalclustering.catchup.CoreResponseHandler;
+import org.neo4j.causalclustering.catchup.CoreClientProtocol;
 
 public class TxPullResponseHandler extends SimpleChannelInboundHandler<TxPullResponse>
 {
-    private final CatchupClientProtocol protocol;
-    private final CatchUpResponseHandler handler;
+    private final CoreClientProtocol protocol;
+    private final CoreResponseHandler handler;
 
-    public TxPullResponseHandler( CatchupClientProtocol protocol,
-                                  CatchUpResponseHandler handler )
+    public TxPullResponseHandler( CoreClientProtocol protocol,
+                                  CoreResponseHandler handler )
     {
         this.protocol = protocol;
         this.handler = handler;
@@ -40,10 +40,10 @@ public class TxPullResponseHandler extends SimpleChannelInboundHandler<TxPullRes
     @Override
     protected void channelRead0( ChannelHandlerContext ctx, final TxPullResponse msg ) throws Exception
     {
-        if ( protocol.isExpecting( CatchupClientProtocol.State.TX_PULL_RESPONSE ) )
+        if ( protocol.isExpecting( CoreClientProtocol.State.TX_PULL_RESPONSE ) )
         {
             handler.onTxPullResponse( msg );
-            protocol.expect( CatchupClientProtocol.State.MESSAGE_TYPE );
+            protocol.expect( CoreClientProtocol.State.MESSAGE_TYPE );
         }
         else
         {

@@ -24,9 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchUpClientException;
-import org.neo4j.causalclustering.catchup.CatchUpResponseAdaptor;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreCommunicationException;
+import org.neo4j.causalclustering.catchup.CoreClientResponseAdaptor;
 import org.neo4j.causalclustering.catchup.CatchupResult;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
@@ -84,7 +84,7 @@ public class CatchupPollingProcess extends LifecycleAdapter
     private final StoreFetcher storeFetcher;
     private final CopiedStoreRecovery copiedStoreRecovery;
     private final Supplier<DatabaseHealth> databaseHealthSupplier;
-    private final CatchUpClient catchUpClient;
+    private final CoreClient coreClient;
     private final CoreMemberSelectionStrategy connectionStrategy;
     private final RenewableTimeoutService timeoutService;
     private final long txPullIntervalMillis;
@@ -97,7 +97,7 @@ public class CatchupPollingProcess extends LifecycleAdapter
     private CompletableFuture<Boolean> upToDateFuture; // we are up-to-date when we are successfully pulling
 
     public CatchupPollingProcess( LogProvider logProvider, FileSystemAbstraction fs, LocalDatabase localDatabase,
-                                  Lifecycle startStopOnStoreCopy, StoreFetcher storeFetcher, CatchUpClient catchUpClient,
+                                  Lifecycle startStopOnStoreCopy, StoreFetcher storeFetcher, CoreClient coreClient,
                                   CoreMemberSelectionStrategy connectionStrategy, RenewableTimeoutService timeoutService,
                                   long txPullIntervalMillis, BatchingTxApplier applier, Monitors monitors,
                                   CopiedStoreRecovery copiedStoreRecovery, Supplier<DatabaseHealth> databaseHealthSupplier )
@@ -107,7 +107,7 @@ public class CatchupPollingProcess extends LifecycleAdapter
         this.log = logProvider.getLog( getClass() );
         this.startStopOnStoreCopy = startStopOnStoreCopy;
         this.storeFetcher = storeFetcher;
-        this.catchUpClient = catchUpClient;
+        this.coreClient = coreClient;
         this.connectionStrategy = connectionStrategy;
         this.timeoutService = timeoutService;
         this.txPullIntervalMillis = txPullIntervalMillis;
@@ -249,7 +249,7 @@ public class CatchupPollingProcess extends LifecycleAdapter
         CatchupResult catchupResult;
         try
         {
-            catchupResult = catchUpClient.makeBlockingRequest( core, txPullRequest, new CatchUpResponseAdaptor<CatchupResult>()
+            catchupResult = coreClient.makeBlockingRequest( core, txPullRequest, new CoreClientResponseAdaptor<CatchupResult>()
             {
                 @Override
                 public void onTxPullResponse( CompletableFuture<CatchupResult> signal, TxPullResponse response )
@@ -266,7 +266,7 @@ public class CatchupPollingProcess extends LifecycleAdapter
                 }
             } );
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             streamComplete();
             return false;

@@ -23,7 +23,13 @@ import org.junit.Test;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import org.neo4j.causalclustering.core.replication.ReplicatedContent;
+import org.neo4j.causalclustering.core.replication.Replicator;
+import org.neo4j.causalclustering.core.replication.session.OperationContext;
 import org.neo4j.kernel.impl.store.id.IdGenerator;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
 import org.neo4j.kernel.impl.store.id.IdType;
@@ -101,10 +107,27 @@ public class ReplicatedTokenHolderTest
         TokenRegistry<Token> registry = new TokenRegistry<>( "Label" );
         int generatedTokenId = 1;
         ReplicatedTokenHolder<Token> tokenHolder = new ReplicatedLabelTokenHolder( registry,
-                ( content, trackResult ) -> {
-                    CompletableFuture<Object> completeFuture = new CompletableFuture<>();
-                    completeFuture.complete( generatedTokenId );
-                    return completeFuture;
+                new Replicator()
+                {
+                    @Override
+                    public Future<Object> replicate( ReplicatedContent content, boolean trackResult, OperationContext context ) throws InterruptedException
+                    {
+                        throw new UnsupportedOperationException(); // TODO
+                    }
+
+                    @Override
+                    public Future<Object> replicate( ReplicatedContent content, boolean trackResult ) throws InterruptedException
+                    {
+                        CompletableFuture<Object> completeFuture = new CompletableFuture<>();
+                        completeFuture.complete( generatedTokenId );
+                        return completeFuture;
+                    }
+
+                    @Override
+                    public void await( long dataVersion, long timeoutMs, TimeUnit timeUnit ) throws TimeoutException
+                    {
+
+                    }
                 },
                 idGeneratorFactory, dependencies );
 

@@ -21,9 +21,9 @@ package org.neo4j.causalclustering.catchup.tx;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchUpClientException;
-import org.neo4j.causalclustering.catchup.CatchUpResponseAdaptor;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreCommunicationException;
+import org.neo4j.causalclustering.catchup.CoreClientResponseAdaptor;
 import org.neo4j.causalclustering.catchup.TxPullRequestResult;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.causalclustering.identity.StoreId;
@@ -31,22 +31,22 @@ import org.neo4j.kernel.monitoring.Monitors;
 
 public class TxPullClient
 {
-    private final CatchUpClient catchUpClient;
+    private final CoreClient coreClient;
     private PullRequestMonitor pullRequestMonitor;
 
-    public TxPullClient( CatchUpClient catchUpClient, Monitors monitors )
+    public TxPullClient( CoreClient coreClient, Monitors monitors )
     {
-        this.catchUpClient = catchUpClient;
+        this.coreClient = coreClient;
         this.pullRequestMonitor = monitors.newMonitor( PullRequestMonitor.class );
     }
 
     public TxPullRequestResult pullTransactions( MemberId from, StoreId storeId, long previousTxId,
                                                  TxPullResponseListener txPullResponseListener )
-            throws CatchUpClientException
+            throws CoreCommunicationException
     {
         pullRequestMonitor.txPullRequest( previousTxId );
-        return catchUpClient.makeBlockingRequest( from, new TxPullRequest( previousTxId, storeId ),
-                new CatchUpResponseAdaptor<TxPullRequestResult>()
+        return coreClient.makeBlockingRequest( from, new TxPullRequest( previousTxId, storeId ),
+                new CoreClientResponseAdaptor<TxPullRequestResult>()
                 {
                     private long lastTxIdReceived = previousTxId;
 

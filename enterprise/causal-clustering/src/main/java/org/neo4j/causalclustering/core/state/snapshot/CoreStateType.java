@@ -23,7 +23,7 @@ import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerS
 import org.neo4j.causalclustering.core.state.storage.StateMarshal;
 import org.neo4j.causalclustering.core.state.machines.id.IdAllocationState;
 import org.neo4j.causalclustering.identity.MemberId;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenState;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenState;
 
 public enum CoreStateType
 {

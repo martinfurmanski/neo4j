@@ -19,10 +19,13 @@
  */
 package org.neo4j.causalclustering.core.state.machines.tx;
 
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import org.neo4j.causalclustering.core.replication.Replicator;
+import org.neo4j.causalclustering.core.replication.session.OperationContext;
+import org.neo4j.causalclustering.core.state.machines.locks.client.CoreLockClient;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
@@ -45,11 +48,21 @@ public class ReplicatedTransactionCommitProcess implements TransactionCommitProc
                         final CommitEvent commitEvent,
                         TransactionApplicationMode mode ) throws TransactionFailureException
     {
+        CoreLockClient locksClient = (CoreLockClient) tx.locksClient().orElseThrow( () -> new IllegalArgumentException( "Replicated commit process requires a core locks client" ) );
         ReplicatedTransaction transaction = createImmutableReplicatedTransaction( tx.transactionRepresentation() );
+
         Future<Object> futureTxId;
         try
         {
-            futureTxId = replicator.replicate( transaction, true );
+            Optional<OperationContext> sessionContext = locksClient.sessionContext();
+            if ( sessionContext.isPresent() )
+            {
+                futureTxId = replicator.replicate( transaction, true, sessionContext.get() );
+            }
+            else
+            {
+                futureTxId = replicator.replicate( transaction, true );
+            }
         }
         catch ( InterruptedException e )
         {

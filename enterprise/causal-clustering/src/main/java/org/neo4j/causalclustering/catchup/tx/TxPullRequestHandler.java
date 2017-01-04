@@ -26,8 +26,8 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.neo4j.causalclustering.catchup.CatchupResult;
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol;
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol.State;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol.State;
 import org.neo4j.causalclustering.catchup.ResponseMessageType;
 import org.neo4j.causalclustering.identity.StoreId;
 import org.neo4j.cursor.IOCursor;
@@ -48,7 +48,7 @@ import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.BASE_TX_I
 
 public class TxPullRequestHandler extends SimpleChannelInboundHandler<TxPullRequest>
 {
-    private final CatchupServerProtocol protocol;
+    private final CoreServerProtocol protocol;
     private final Supplier<StoreId> storeIdSupplier;
     private final BooleanSupplier databaseAvailable;
     private final int batchSize;
@@ -57,10 +57,10 @@ public class TxPullRequestHandler extends SimpleChannelInboundHandler<TxPullRequ
     private final TxPullRequestsMonitor monitor;
     private final Log log;
 
-    public TxPullRequestHandler( CatchupServerProtocol protocol, Supplier<StoreId> storeIdSupplier,
-                                 BooleanSupplier databaseAvailable, Supplier<TransactionIdStore> transactionIdStoreSupplier,
-
-                                 Supplier<LogicalTransactionStore> logicalTransactionStoreSupplier, int batchSize, Monitors monitors, LogProvider logProvider )
+    public TxPullRequestHandler( CoreServerProtocol protocol, Supplier<StoreId> storeIdSupplier,
+            BooleanSupplier databaseAvailable, Supplier<TransactionIdStore> transactionIdStoreSupplier,
+            Supplier<LogicalTransactionStore> logicalTransactionStoreSupplier, int batchSize,
+            Monitors monitors, LogProvider logProvider )
     {
         this.protocol = protocol;
         this.storeIdSupplier = storeIdSupplier;

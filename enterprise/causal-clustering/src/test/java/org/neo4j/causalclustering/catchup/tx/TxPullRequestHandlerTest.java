@@ -22,7 +22,7 @@ package org.neo4j.causalclustering.catchup.tx;
 import io.netty.channel.ChannelHandlerContext;
 import org.junit.Test;
 
-import org.neo4j.causalclustering.catchup.CatchupServerProtocol;
+import org.neo4j.causalclustering.catchup.CoreServerProtocol;
 import org.neo4j.causalclustering.catchup.ResponseMessageType;
 import org.neo4j.causalclustering.identity.StoreId;
 import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
@@ -71,7 +71,7 @@ public class TxPullRequestHandlerTest
         when( logicalTransactionStore.getTransactions( 14L ) ).thenReturn( txCursor( cursor( tx( 14 ), tx( 15 ) ) ) );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> storeId, () -> true,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> storeId, () -> true,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(),
                         NullLogProvider.getInstance() );
 
@@ -101,7 +101,7 @@ public class TxPullRequestHandlerTest
                 cursor( tx( 14 ), tx( 15 ), tx( 16 ), tx( 17 ) ) ) );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> storeId, () -> true,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> storeId, () -> true,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(),
                         NullLogProvider.getInstance() );
 
@@ -130,7 +130,7 @@ public class TxPullRequestHandlerTest
         LogicalTransactionStore logicalTransactionStore = mock( LogicalTransactionStore.class );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> storeId, () -> true,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> storeId, () -> true,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(),
                         NullLogProvider.getInstance() );
 
@@ -155,7 +155,7 @@ public class TxPullRequestHandlerTest
         when( logicalTransactionStore.getTransactions( 14L ) ).thenThrow( new NoSuchTransactionException( 14 ) );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> storeId, () -> true,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> storeId, () -> true,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(), logProvider );
 
         // when
@@ -180,7 +180,7 @@ public class TxPullRequestHandlerTest
         LogicalTransactionStore logicalTransactionStore = mock( LogicalTransactionStore.class );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> serverStoreId, () -> true,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> serverStoreId, () -> true,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(), logProvider );
 
         // when
@@ -205,7 +205,7 @@ public class TxPullRequestHandlerTest
         LogicalTransactionStore logicalTransactionStore = mock( LogicalTransactionStore.class );
 
         TxPullRequestHandler txPullRequestHandler =
-                new TxPullRequestHandler( new CatchupServerProtocol(), () -> storeId, () -> false,
+                new TxPullRequestHandler( new CoreServerProtocol(), () -> storeId, () -> false,
                         () -> transactionIdStore, () -> logicalTransactionStore, BATCH_SIZE, new Monitors(), logProvider );
 
         // when

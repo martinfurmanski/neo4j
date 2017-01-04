@@ -103,9 +103,7 @@ class Candidate implements RaftMessageHandler
 
                 if ( isQuorum( ctx.votingMembers().size(), outcome.getVotesForMe().size() ) )
                 {
-
                     outcome.setLeader( ctx.myself() );
-                    Appending.appendNewEntry( ctx, outcome, new NewLeaderBarrier() );
 
                     outcome.setLastLogIndexBeforeWeBecameLeader( ctx.entryLog().appendIndex() );
                     outcome.electedLeader();

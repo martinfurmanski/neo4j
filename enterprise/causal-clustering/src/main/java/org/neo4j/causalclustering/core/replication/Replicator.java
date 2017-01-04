@@ -20,6 +20,11 @@
 package org.neo4j.causalclustering.core.replication;
 
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.OperationContext;
 
 /**
  * Replicate content across a cluster of servers.
@@ -33,8 +38,21 @@ public interface Replicator
      *
      * @param content      The content to replicated.
      * @param trackResult  Whether to track the result for this operation.
+     * @param session      An already existing session context.
      *
      * @return A future that will receive the result when available. Only valid if trackResult is set.
      */
+    Future<Object> replicate( ReplicatedContent content, boolean trackResult, OperationContext session ) throws InterruptedException;
+
+    /** @see #replicate above */
     Future<Object> replicate( ReplicatedContent content, boolean trackResult ) throws InterruptedException;
+
+    /**
+     *
+     *
+     * @param dataVersion
+     * @param timeoutMs
+     * @param timeUnit
+     */
+    void await( long dataVersion, long timeoutMs, TimeUnit timeUnit ) throws TimeoutException;
 }

@@ -20,6 +20,7 @@
 package org.neo4j.causalclustering.core.consensus;
 
 import java.io.File;
+import java.util.function.Supplier;
 
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
 import org.neo4j.causalclustering.core.EnterpriseCoreEditionModule;
@@ -39,6 +40,7 @@ import org.neo4j.causalclustering.core.consensus.shipping.RaftLogShippingManager
 import org.neo4j.causalclustering.core.consensus.term.MonitoredTermStateStorage;
 import org.neo4j.causalclustering.core.consensus.term.TermState;
 import org.neo4j.causalclustering.core.consensus.vote.VoteState;
+import org.neo4j.causalclustering.core.replication.ReplicatedContent;
 import org.neo4j.causalclustering.core.replication.SendToMyself;
 import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
 import org.neo4j.causalclustering.core.state.storage.StateStorage;
@@ -75,7 +77,7 @@ public class ConsensusModule
     private final InFlightMap<RaftLogEntry> inFlightMap = new InFlightMap<>();
 
     public ConsensusModule( MemberId myself, final PlatformModule platformModule, Outbound<MemberId,RaftMessages.RaftMessage> outbound,
-            File clusterStateDirectory, CoreTopologyService discoveryService )
+            File clusterStateDirectory, CoreTopologyService discoveryService, Supplier<ReplicatedContent> barrier )
     {
         final Config config = platformModule.config;
         final LogService logging = platformModule.logging;
@@ -119,25 +121,22 @@ public class ConsensusModule
 
         SendToMyself leaderOnlyReplicator = new SendToMyself( myself, outbound );
 
-        raftMembershipManager = new RaftMembershipManager( leaderOnlyReplicator, memberSetBuilder, raftLog, logProvider,
-                expectedClusterSize, electionTimeout, systemClock(),
-                config.get( join_catch_up_timeout ), raftMembershipStorage
-        );
+        raftMembershipManager = new RaftMembershipManager( leaderOnlyReplicator, memberSetBuilder,
+                raftLog, logProvider, expectedClusterSize, electionTimeout, systemClock(),
+                config.get( join_catch_up_timeout ), raftMembershipStorage );
 
         life.add( raftMembershipManager );
 
-        RaftLogShippingManager logShipping =
-                new RaftLogShippingManager( outbound, logProvider, raftLog, systemClock(),
-                        myself, raftMembershipManager, electionTimeout,
-                        config.get( catchup_batch_size ),
-                        config.get( log_shipping_max_lag ), inFlightMap );
+        RaftLogShippingManager logShipping = new RaftLogShippingManager( outbound, logProvider,
+                raftLog, systemClock(), myself, raftMembershipManager, electionTimeout,
+                config.get( catchup_batch_size ),
+                config.get( log_shipping_max_lag ), inFlightMap );
 
         raftTimeoutService = new DelayedRenewableTimeoutService( systemClock(), logProvider );
 
-        raftMachine =
-                new RaftMachine( myself, termState, voteState, raftLog, electionTimeout,
-                        heartbeatInterval, raftTimeoutService, outbound, logProvider, raftMembershipManager,
-                        logShipping, inFlightMap, platformModule.monitors );
+        raftMachine = new RaftMachine( myself, termState, voteState, raftLog, electionTimeout,
+                heartbeatInterval, raftTimeoutService, outbound, logProvider, raftMembershipManager,
+                logShipping, inFlightMap, platformModule.monitors, barrier );
 
         life.add( new RaftDiscoveryServiceConnector( discoveryService, raftMachine ) );
 

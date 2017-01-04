@@ -31,12 +31,12 @@ import static org.junit.Assert.assertNotEquals;
 public class LocalSessionPoolTest
 {
     private MemberId memberId = new MemberId( UUID.randomUUID() );
-    private GlobalSession globalSession = new GlobalSession( UUID.randomUUID(), memberId );
+    private GlobalSessionId globalSessionId = new GlobalSessionId( UUID.randomUUID(), memberId );
 
     @Test
     public void poolGivesBackSameSessionAfterRelease()
     {
-        LocalSessionPool sessionPool = new LocalSessionPool( globalSession );
+        LocalSessionPool sessionPool = new LocalSessionPool( globalSessionId );
 
         OperationContext contextA = sessionPool.acquireSession();
         sessionPool.releaseSession( contextA );
@@ -50,7 +50,7 @@ public class LocalSessionPoolTest
     @Test
     public void sessionAcquirementIncreasesOperationId()
     {
-        LocalSessionPool sessionPool = new LocalSessionPool( globalSession );
+        LocalSessionPool sessionPool = new LocalSessionPool( globalSessionId );
         OperationContext context;
 
         context = sessionPool.acquireSession();
@@ -67,7 +67,7 @@ public class LocalSessionPoolTest
     @Test
     public void poolHasIndependentSessions()
     {
-        LocalSessionPool sessionPool = new LocalSessionPool( globalSession );
+        LocalSessionPool sessionPool = new LocalSessionPool( globalSessionId );
 
         OperationContext contextA = sessionPool.acquireSession();
         OperationContext contextB = sessionPool.acquireSession();

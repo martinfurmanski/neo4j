@@ -22,8 +22,8 @@ package org.neo4j.causalclustering.core.state.machines.tx;
 import org.junit.Test;
 
 import org.neo4j.causalclustering.core.replication.DirectReplicator;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionToApply;
@@ -76,7 +76,7 @@ public class CommitProcessStateMachineCollaborationTest
     private ReplicatedLockTokenStateMachine lockState( int lockSessionId )
     {
         ReplicatedLockTokenStateMachine lockState = mock( ReplicatedLockTokenStateMachine.class );
-        when( lockState.currentToken() ).thenReturn( new ReplicatedLockTokenRequest( null, lockSessionId ) );
+        when( lockState.currentToken() ).thenReturn( new ReplicatedLockToken( null, lockSessionId ) );
         return lockState;
     }
 }

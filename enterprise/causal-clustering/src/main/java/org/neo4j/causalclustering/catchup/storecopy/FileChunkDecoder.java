@@ -25,8 +25,6 @@ import io.netty.handler.codec.MessageToMessageDecoder;
 
 import java.util.List;
 
-import org.neo4j.causalclustering.messaging.NetworkReadableClosableChannelNetty4;
-
 /**
  * This class does not consume bytes during the decode method. Instead, it puts a {@link FileChunk} object with
  * a reference to the buffer, to be consumed later. This is the reason it does not extend
@@ -38,6 +36,6 @@ public class FileChunkDecoder extends MessageToMessageDecoder<ByteBuf>
     @Override
     protected void decode( ChannelHandlerContext ctx, ByteBuf msg, List<Object> out ) throws Exception
     {
-        out.add( FileChunk.marshal().unmarshal( new NetworkReadableClosableChannelNetty4( msg ) ) );
+        out.add( FileChunk.marshal().unmarshal( msg ) );
     }
 }

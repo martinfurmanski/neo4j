@@ -30,14 +30,14 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-import org.neo4j.causalclustering.catchup.CatchupServer;
+import org.neo4j.causalclustering.catchup.CoreServer;
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
 import org.neo4j.causalclustering.core.state.CoreState;
+import org.neo4j.causalclustering.core.state.machines.locks.server.LockServer;
 import org.neo4j.causalclustering.discovery.CoreTopologyService;
 import org.neo4j.causalclustering.discovery.HazelcastDiscoveryServiceFactory;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.util.Neo4jJobScheduler;
@@ -82,15 +82,15 @@ public class ConnectionInfoIT
         Config config = Config.defaults()
                 .with( singletonMap( transaction_listen_address.name(), ":" + testSocket.getLocalPort() ) );
 
-        CatchupServer catchupServer =
-                new CatchupServer( logProvider, userLogProvider, mockSupplier(), mockSupplier(), mockSupplier(),
+        CoreServer coreServer =
+                new CoreServer( logProvider, userLogProvider, mockSupplier(), mockSupplier(), mockSupplier(),
                         mockSupplier(), mock( BooleanSupplier.class ), coreState, config, new Monitors(),
-                        mockSupplier(), mock( FileSystemAbstraction.class ) );
+                        mockSupplier(), mock( FileSystemAbstraction.class ), mock( LockServer.class ) );
 
         //then
         try
         {
-            catchupServer.start();
+            coreServer.start();
         }
         catch ( Throwable throwable )
         {

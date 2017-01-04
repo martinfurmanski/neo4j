@@ -23,8 +23,8 @@ import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
@@ -179,7 +179,7 @@ public class ReplicatedTransactionStateMachineTest
     {
         @SuppressWarnings( "unchecked" )
         ReplicatedLockTokenStateMachine lockState = mock( ReplicatedLockTokenStateMachine.class );
-        when( lockState.currentToken() ).thenReturn( new ReplicatedLockTokenRequest( null, lockSessionId ) );
+        when( lockState.currentToken() ).thenReturn( new ReplicatedLockToken( null, lockSessionId ) );
         return lockState;
     }
 }

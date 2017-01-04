@@ -25,7 +25,7 @@ import org.junit.Test;
 import java.io.File;
 import java.util.UUID;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
+import org.neo4j.causalclustering.catchup.CoreClient;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
 import org.neo4j.causalclustering.catchup.storecopy.StoreCopyFailedException;
@@ -52,7 +52,7 @@ public class CoreStateDownloaderTest
     private final LocalDatabase localDatabase = mock( LocalDatabase.class );
     private final Lifecycle startStopLife = mock( Lifecycle.class );
     private final StoreFetcher storeFetcher = mock( StoreFetcher.class );
-    private final CatchUpClient catchUpClient = mock( CatchUpClient.class );
+    private final CoreClient coreClient = mock( CoreClient.class );
     private final CopiedStoreRecovery recovery = mock( CopiedStoreRecovery.class );
     private final CoreState coreState = mock( CoreState.class );
 
@@ -64,7 +64,7 @@ public class CoreStateDownloaderTest
     private final File tempDir = new File( "graph.db/temp-copy" );
 
     private final CoreStateDownloader downloader =
-            new CoreStateDownloader( fs, localDatabase, startStopLife, storeFetcher, catchUpClient, logProvider,
+            new CoreStateDownloader( fs, localDatabase, startStopLife, storeFetcher, coreClient, logProvider,
                     recovery );
 
     @Before

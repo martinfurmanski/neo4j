@@ -35,7 +35,7 @@ import org.neo4j.logging.Log;
 
 import static java.lang.String.format;
 
-class Appending
+public class Appending
 {
     static void handleAppendEntriesRequest( ReadableRaftState state, Outcome outcome,
             RaftMessages.AppendEntries.Request request, Log log ) throws IOException
@@ -112,7 +112,7 @@ class Appending
         outcome.addOutgoingMessage( new RaftMessages.Directed( request.from(), appendResponse ) );
     }
 
-    static void appendNewEntry( ReadableRaftState ctx, Outcome outcome, ReplicatedContent content ) throws IOException
+    public static void appendNewEntry( ReadableRaftState ctx, Outcome outcome, ReplicatedContent content ) throws IOException
     {
         long prevLogIndex = ctx.entryLog().appendIndex();
         long prevLogTerm = prevLogIndex == -1 ? -1 :

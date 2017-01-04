@@ -73,8 +73,6 @@ public class CandidateTest
 
         // then
         assertEquals( LEADER, outcome.getRole() );
-        assertThat( outcome.getLogCommands(), hasItem( new AppendLogEntry( 0,
-                new RaftLogEntry( state.term(), new NewLeaderBarrier() ) ) ) );
     }
 
     @Test

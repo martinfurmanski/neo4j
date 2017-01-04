@@ -83,6 +83,8 @@ public class MemberId
      */
     public static class Marshal extends SafeStateMarshal<MemberId>
     {
+        public static final Marshal INSTANCE = new Marshal();
+
         @Override
         public void marshal( MemberId memberId, WritableChannel channel ) throws IOException
         {

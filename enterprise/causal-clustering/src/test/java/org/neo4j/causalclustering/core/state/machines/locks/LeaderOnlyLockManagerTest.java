@@ -23,6 +23,8 @@ import org.junit.Test;
 
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.replication.DirectReplicator;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenState;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.causalclustering.core.state.storage.InMemoryStateStorage;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.kernel.impl.locking.Locks;

@@ -163,6 +163,8 @@ public interface Status
                 "The database was unable to write transaction to log." ),
 
         // transient errors
+        LockSessionAcquisitionFailure( TransientError,
+                "A lock session could not be acquired." ),
         LockSessionExpired( TransientError,
                 "The lock session under which this transaction was started is no longer valid." ),
         DeadlockDetected( TransientError,
@@ -486,10 +488,9 @@ public interface Status
         // transient errors
         NoLeaderAvailable( TransientError,
                 "No leader available at the moment. Retrying your request at a later time may succeed." ),
-
-        NotALeader( ClientError,
+        NotALeader( TransientError,
                 "The request cannot be processed by this server. Write requests can only be processed by the leader." ),
-                ;
+        ;
 
         private final Code code;
 

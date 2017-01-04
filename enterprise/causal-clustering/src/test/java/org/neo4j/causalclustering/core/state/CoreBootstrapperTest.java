@@ -28,7 +28,7 @@ import org.junit.Test;
 import org.neo4j.causalclustering.backup.RestoreClusterUtils;
 import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerState;
 import org.neo4j.causalclustering.core.state.machines.id.IdAllocationState;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenState;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenState;
 import org.neo4j.causalclustering.core.state.machines.tx.LastCommittedIndexFinder;
 import org.neo4j.causalclustering.core.state.snapshot.CoreSnapshot;
 import org.neo4j.causalclustering.core.state.snapshot.CoreStateType;

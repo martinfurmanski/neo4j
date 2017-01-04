@@ -175,7 +175,7 @@ public class CausalClusteringSettings
     @Description( "The catch up protocol times out if the given duration elapses with not network activity. " +
             "Every message received by the client from the server extends the time out duration." )
     @Internal
-    public static final Setting<Long> catch_up_client_inactivity_timeout =
+    public static final Setting<Long> core_client_inactivity_timeout =
             setting( "causal_clustering.catch_up_client_inactivity_timeout", DURATION, "5s" );
 
     @Description("Throttle limit for logging unknown cluster member address")
@@ -210,6 +210,10 @@ public class CausalClusteringSettings
             "returned as read end points regardless the value of this setting." )
     public static final Setting<Boolean> cluster_allow_reads_on_followers =
             setting( "causal_clustering.cluster_allow_reads_on_followers", BOOLEAN, Settings.FALSE );
+
+    @Description( "Allow writes on followers. The alternative is to only allow writes at the leader." )
+    public static final Setting<Boolean> cluster_allow_writes_on_followers =
+            setting( "causal_clustering.cluster_allow_writes_on_followers", BOOLEAN, Settings.TRUE );
 
     @Description( "The size of the ID allocation requests Core servers will make when they run out of NODE IDs. " +
             "Larger values mean less frequent requests but also result in more unused IDs (and unused disk space) " +

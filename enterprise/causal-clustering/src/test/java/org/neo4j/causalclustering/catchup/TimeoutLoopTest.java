@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import org.neo4j.logging.NullLog;
-import org.neo4j.logging.NullLogProvider;
 
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
@@ -70,7 +69,7 @@ public class TimeoutLoopTest
             TimeoutLoop.<Long>waitForCompletion( future, "", lastResponseSupplier, 1, NullLog.getInstance() );
             fail( "Should have timed out" );
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             // then
             // expected
@@ -108,7 +107,7 @@ public class TimeoutLoopTest
             TimeoutLoop.<Long>waitForCompletion( future, "", () -> 1L, 2, NullLog.getInstance() );
             fail( "Should have thrown exception" );
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             // expected
         }

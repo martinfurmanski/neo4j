@@ -27,20 +27,29 @@ import java.io.PrintWriter;
 import java.util.function.Supplier;
 
 import org.neo4j.causalclustering.ReplicationModule;
+import org.neo4j.causalclustering.catchup.CoreClient;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
 import org.neo4j.causalclustering.catchup.storecopy.StoreFiles;
 import org.neo4j.causalclustering.core.consensus.ConsensusModule;
 import org.neo4j.causalclustering.core.consensus.RaftMachine;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
+import org.neo4j.causalclustering.core.replication.ReplicatedContent;
 import org.neo4j.causalclustering.core.server.CoreServerModule;
 import org.neo4j.causalclustering.core.state.ClusteringModule;
 import org.neo4j.causalclustering.core.state.machines.CoreStateMachinesModule;
+import org.neo4j.causalclustering.core.state.machines.locks.token.LockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenState;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
+import org.neo4j.causalclustering.core.state.storage.StateStorage;
 import org.neo4j.causalclustering.discovery.CoreTopologyService;
 import org.neo4j.causalclustering.discovery.DiscoveryServiceFactory;
 import org.neo4j.causalclustering.discovery.procedures.ClusterOverviewProcedure;
 import org.neo4j.causalclustering.discovery.procedures.CoreRoleProcedure;
 import org.neo4j.causalclustering.discovery.procedures.GetServersProcedure;
+import org.neo4j.causalclustering.identity.IdentityModule;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.causalclustering.logging.BetterMessageLogger;
 import org.neo4j.causalclustering.logging.MessageLogger;
@@ -69,6 +78,7 @@ import org.neo4j.kernel.impl.enterprise.EnterpriseConstraintSemantics;
 import org.neo4j.kernel.impl.enterprise.EnterpriseEditionModule;
 import org.neo4j.kernel.impl.enterprise.StandardBoltConnectionTracker;
 import org.neo4j.kernel.impl.enterprise.transaction.log.checkpoint.ConfigurableIOLimiter;
+import org.neo4j.kernel.impl.factory.CanWrite;
 import org.neo4j.kernel.impl.factory.DatabaseInfo;
 import org.neo4j.kernel.impl.factory.EditionModule;
 import org.neo4j.kernel.impl.factory.PlatformModule;
@@ -86,7 +96,12 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.LifecycleStatus;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.time.Clocks;
 import org.neo4j.udc.UsageData;
+
+import static org.neo4j.causalclustering.core.CausalClusteringSettings.cluster_allow_writes_on_followers;
+import static org.neo4j.causalclustering.core.CausalClusteringSettings.replicated_lock_token_state_size;
+import static org.neo4j.causalclustering.core.state.machines.CoreStateMachinesModule.LOCK_TOKEN_NAME;
 
 /**
  * This implementation of {@link org.neo4j.kernel.impl.factory.EditionModule} creates the implementations of services
@@ -144,7 +159,7 @@ public class EnterpriseCoreEditionModule extends EditionModule
 
         IdentityModule identityModule = new IdentityModule( platformModule, clusterStateDirectory );
 
-        ClusteringModule clusteringModule = new ClusteringModule( discoveryServiceFactory, identityModule.myself(),
+        ClusteringModule clusteringModule = new ClusteringModule( discoveryServiceFactory, identityModule.myIdentity(),
                 platformModule, clusterStateDirectory );
         topologyService = clusteringModule.topologyService();
 
@@ -156,24 +171,41 @@ public class EnterpriseCoreEditionModule extends EditionModule
                 logProvider, platformModule.monitors, maxQueueSize );
         life.add( raftSender );
 
-        final MessageLogger<MemberId> messageLogger = createMessageLogger( config, life, identityModule.myself() );
+        final MessageLogger<MemberId> messageLogger = createMessageLogger( config, life, identityModule.myIdentity() );
 
         RaftOutbound raftOutbound = new RaftOutbound( topologyService, raftSender, clusteringModule.clusterIdentity(),
                 logProvider, logThresholdMillis );
         Outbound<MemberId,RaftMessages.RaftMessage> loggingOutbound = new LoggingOutbound<>( raftOutbound,
-                identityModule.myself(), messageLogger );
+                identityModule.myIdentity(), messageLogger );
 
-        consensusModule = new ConsensusModule( identityModule.myself(), platformModule, loggingOutbound,
-                clusterStateDirectory, topologyService );
+        StateStorage<ReplicatedLockTokenState> lockTokenState = life.add(
+                new DurableStateStorage<>( fileSystem, clusterStateDirectory, LOCK_TOKEN_NAME,
+                        new ReplicatedLockTokenState.Marshal( new MemberId.Marshal() ),
+                        config.get( replicated_lock_token_state_size ), logProvider ) );
+
+        ReplicatedLockTokenStateMachine replicatedLockTokenStateMachine =
+                new ReplicatedLockTokenStateMachine( lockTokenState );
+
+        // TODO: Where should this live?
+        Supplier<ReplicatedContent> barrier = () ->
+        {
+            int nextId = LockToken.nextCandidateId( replicatedLockTokenStateMachine.currentToken().id() );
+            return new ReplicatedLockToken( identityModule.myIdentity(), nextId );
+        };
+
+        consensusModule = new ConsensusModule( identityModule.myIdentity(), platformModule, loggingOutbound,
+                clusterStateDirectory, topologyService, barrier );
 
         dependencies.satisfyDependency( consensusModule.raftMachine() );
 
-        ReplicationModule replicationModule = new ReplicationModule( identityModule.myself(), platformModule, config, consensusModule,
+        ReplicationModule replicationModule = new ReplicationModule( identityModule, platformModule, config, consensusModule,
                 loggingOutbound, clusterStateDirectory, fileSystem, logProvider );
 
-        CoreStateMachinesModule coreStateMachinesModule = new CoreStateMachinesModule( identityModule.myself(), platformModule, clusterStateDirectory,
-                config,
-                replicationModule.getReplicator(), consensusModule.raftMachine(), dependencies, localDatabase );
+        CoreClient coreClient = life.add( new CoreClient( clusteringModule.topologyService(), logProvider,
+                Clocks.systemClock(), config.get( CausalClusteringSettings.core_client_inactivity_timeout ), monitors ) );
+
+        CoreStateMachinesModule coreStateMachinesModule = new CoreStateMachinesModule( identityModule, platformModule, clusterStateDirectory,
+                config, replicationModule.getReplicator(), consensusModule.raftMachine(), dependencies, localDatabase, coreClient, replicatedLockTokenStateMachine );
 
         this.idGeneratorFactory = coreStateMachinesModule.idGeneratorFactory;
         this.idTypeConfigurationProvider = coreStateMachinesModule.idTypeConfigurationProvider;
@@ -182,11 +214,19 @@ public class EnterpriseCoreEditionModule extends EditionModule
         this.relationshipTypeTokenHolder = coreStateMachinesModule.relationshipTypeTokenHolder;
         this.lockManager = coreStateMachinesModule.lockManager;
         this.commitProcessFactory = coreStateMachinesModule.commitProcessFactory;
-        this.accessCapability = new LeaderCanWrite( consensusModule.raftMachine() );
+
+        if ( config.get( cluster_allow_writes_on_followers ) )
+        {
+            this.accessCapability = new CanWrite();
+        }
+        else
+        {
+            this.accessCapability = new LeaderCanWrite( consensusModule.raftMachine() );
+        }
 
         CoreServerModule coreServerModule = new CoreServerModule( identityModule, platformModule, consensusModule,
                 coreStateMachinesModule, replicationModule, clusterStateDirectory, clusteringModule, localDatabase,
-                messageLogger, databaseHealthSupplier );
+                messageLogger, databaseHealthSupplier, coreClient );
 
         editionInvariants( platformModule, dependencies, config, logging, life );
 

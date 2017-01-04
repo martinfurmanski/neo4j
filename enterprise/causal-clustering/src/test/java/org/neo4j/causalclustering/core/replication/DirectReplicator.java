@@ -21,8 +21,10 @@ package org.neo4j.causalclustering.core.replication;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import org.neo4j.causalclustering.core.replication.session.OperationContext;
 import org.neo4j.causalclustering.core.state.machines.StateMachine;
 
 public class DirectReplicator<Command extends ReplicatedContent> implements Replicator
@@ -36,16 +38,28 @@ public class DirectReplicator<Command extends ReplicatedContent> implements Repl
     }
 
     @Override
+    public Future<Object> replicate( ReplicatedContent content, boolean trackResult, OperationContext context ) throws InterruptedException
+    {
+        return replicate( content, trackResult ); // TODO
+    }
+
+    @Override
     public synchronized Future<Object> replicate( ReplicatedContent content, boolean trackResult )
     {
-        AtomicReference<CompletableFuture<Object>> futureResult = new AtomicReference<>( new CompletableFuture<>() );
+        CompletableFuture<Object> futureResult = new CompletableFuture<>();
         stateMachine.applyCommand( (Command) content, commandIndex++, result -> {
             if ( trackResult )
             {
-                futureResult.getAndUpdate( result::apply );
+                result.apply( futureResult );
             }
         } );
 
-        return futureResult.get();
+        return futureResult;
+    }
+
+    @Override
+    public void await( long dataVersion, long timeoutMs, TimeUnit timeUnit ) throws TimeoutException
+    {
+        throw new UnsupportedOperationException();
     }
 }

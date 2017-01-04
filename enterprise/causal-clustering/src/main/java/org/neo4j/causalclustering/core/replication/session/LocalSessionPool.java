@@ -27,12 +27,12 @@ public class LocalSessionPool
 {
     private final Stack<LocalSession> sessionStack = new Stack<>();
 
-    private final GlobalSession globalSession;
+    private final GlobalSessionId globalSessionId;
     private long nextLocalSessionId;
 
-    public LocalSessionPool( GlobalSession globalSession )
+    public LocalSessionPool( GlobalSessionId globalSessionId )
     {
-        this.globalSession = globalSession;
+        this.globalSessionId = globalSessionId;
     }
 
     private LocalSession createSession()
@@ -40,9 +40,9 @@ public class LocalSessionPool
         return new LocalSession( nextLocalSessionId++ );
     }
 
-    public GlobalSession getGlobalSession()
+    public GlobalSessionId getGlobalSessionId()
     {
-        return globalSession;
+        return globalSessionId;
     }
 
     /**
@@ -61,7 +61,7 @@ public class LocalSessionPool
             localSession = createSession();
         }
 
-        return new OperationContext( globalSession, localSession.nextOperationId(), localSession );
+        return new OperationContext( globalSessionId, localSession.nextOperationId(), localSession );
     }
 
     /**

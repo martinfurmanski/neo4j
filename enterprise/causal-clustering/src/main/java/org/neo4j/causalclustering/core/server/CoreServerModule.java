@@ -25,8 +25,8 @@ import java.util.function.Supplier;
 import org.neo4j.backup.OnlineBackupKernelExtension;
 import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.causalclustering.ReplicationModule;
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchupServer;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreServer;
 import org.neo4j.causalclustering.catchup.CheckpointerSupplier;
 import org.neo4j.causalclustering.catchup.storecopy.CopiedStoreRecovery;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
@@ -35,7 +35,8 @@ import org.neo4j.causalclustering.catchup.storecopy.StoreFetcher;
 import org.neo4j.causalclustering.catchup.tx.TransactionLogCatchUpFactory;
 import org.neo4j.causalclustering.catchup.tx.TxPullClient;
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
-import org.neo4j.causalclustering.core.IdentityModule;
+import org.neo4j.causalclustering.core.state.machines.locks.server.LockServer;
+import org.neo4j.causalclustering.identity.IdentityModule;
 import org.neo4j.causalclustering.core.consensus.ConsensusModule;
 import org.neo4j.causalclustering.core.consensus.ContinuousJob;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
@@ -70,7 +71,6 @@ import org.neo4j.kernel.internal.DatabaseHealth;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
-import org.neo4j.time.Clocks;
 
 import static org.neo4j.kernel.impl.util.JobScheduler.SchedulingStrategy.NEW_THREAD;
 
@@ -82,9 +82,9 @@ public class CoreServerModule
     public final MembershipWaiterLifecycle membershipWaiterLifecycle;
 
     public CoreServerModule( IdentityModule identityModule, final PlatformModule platformModule, ConsensusModule consensusModule,
-                             CoreStateMachinesModule coreStateMachinesModule, ReplicationModule replicationModule,
-                             File clusterStateDirectory, ClusteringModule clusteringModule,
-                             LocalDatabase localDatabase, MessageLogger<MemberId> messageLogger, Supplier<DatabaseHealth> dbHealthSupplier )
+            CoreStateMachinesModule coreStateMachinesModule, ReplicationModule replicationModule,
+            File clusterStateDirectory, ClusteringModule clusteringModule,
+            LocalDatabase localDatabase, MessageLogger<MemberId> messageLogger, Supplier<DatabaseHealth> dbHealthSupplier, CoreClient coreClient )
     {
         final Dependencies dependencies = platformModule.dependencies;
         final Config config = platformModule.config;
@@ -110,14 +110,10 @@ public class CoreServerModule
                 new RaftServer( new CoreReplicatedContentMarshal(), config, logProvider, userLogProvider, monitors );
 
         LoggingInbound<RaftMessages.ClusterIdAwareMessage> loggingRaftInbound =
-                new LoggingInbound<>( raftServer, messageLogger, identityModule.myself() );
-
-        long inactivityTimeoutMillis = config.get( CausalClusteringSettings.catch_up_client_inactivity_timeout );
-        CatchUpClient catchUpClient = life.add( new CatchUpClient( clusteringModule.topologyService(), logProvider,
-                Clocks.systemClock(), inactivityTimeoutMillis, monitors ) );
+                new LoggingInbound<>( raftServer, messageLogger, identityModule.myIdentity() );
 
         StoreFetcher storeFetcher = new StoreFetcher( logProvider, fileSystem, platformModule.pageCache,
-                new StoreCopyClient( catchUpClient, logProvider ), new TxPullClient( catchUpClient, platformModule.monitors ),
+                new StoreCopyClient( coreClient, logProvider ), new TxPullClient( coreClient, platformModule.monitors ),
                 new TransactionLogCatchUpFactory(), platformModule.monitors );
 
         CoreStateApplier coreStateApplier = new CoreStateApplier( logProvider );
@@ -129,7 +125,7 @@ public class CoreServerModule
         LifeSupport servicesToStopOnStoreCopy = new LifeSupport();
         CoreStateDownloader downloader =
                 new CoreStateDownloader( platformModule.fileSystem, localDatabase, servicesToStopOnStoreCopy,
-                        storeFetcher, catchUpClient, logProvider, copiedStoreRecovery );
+                        storeFetcher, coreClient, logProvider, copiedStoreRecovery );
 
         if ( config.get( OnlineBackupSettings.online_backup_enabled ) )
         {
@@ -179,7 +175,7 @@ public class CoreServerModule
         long electionTimeout = config.get( CausalClusteringSettings.leader_election_timeout );
 
         MembershipWaiter membershipWaiter =
-                new MembershipWaiter( identityModule.myself(), jobScheduler, dbHealthSupplier, electionTimeout * 4,
+                new MembershipWaiter( identityModule.myIdentity(), jobScheduler, dbHealthSupplier, electionTimeout * 4,
                         logProvider );
         long joinCatchupTimeout = config.get( CausalClusteringSettings.join_catch_up_timeout );
         membershipWaiterLifecycle = new MembershipWaiterLifecycle( membershipWaiter,
@@ -187,13 +183,16 @@ public class CoreServerModule
 
         loggingRaftInbound.registerHandler( batchingMessageHandler );
 
-        CatchupServer catchupServer = new CatchupServer( logProvider, userLogProvider, localDatabase::storeId,
+        LockServer lockServer = new LockServer( coreStateMachinesModule.localLocks );
+
+        CoreServer coreServer = new CoreServer( logProvider, userLogProvider, localDatabase::storeId,
                 platformModule.dependencies.provideDependency( TransactionIdStore.class ),
                 platformModule.dependencies.provideDependency( LogicalTransactionStore.class ),
                 localDatabase::dataSource, localDatabase::isAvailable, coreState, config,
-                platformModule.monitors, new CheckpointerSupplier( platformModule.dependencies ), fileSystem );
+                platformModule.monitors, new CheckpointerSupplier( platformModule.dependencies ), fileSystem,
+                lockServer );
 
-        servicesToStopOnStoreCopy.add( catchupServer );
+        servicesToStopOnStoreCopy.add( coreServer );
 
         // batches messages from raft server -> core state
         // core state will drop messages if not ready
@@ -203,6 +202,6 @@ public class CoreServerModule
 
         life.add( raftServer ); // must start before core state so that it can trigger snapshot downloads when necessary
         life.add( coreState );
-        life.add( catchupServer ); // must start last and stop first, since it handles external requests
+        life.add( coreServer ); // must start last and stop first, since it handles external requests
     }
 }

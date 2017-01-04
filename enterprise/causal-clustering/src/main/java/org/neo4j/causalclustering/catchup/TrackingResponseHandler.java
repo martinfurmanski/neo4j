@@ -29,24 +29,25 @@ import org.neo4j.causalclustering.catchup.storecopy.GetStoreIdResponse;
 import org.neo4j.causalclustering.catchup.storecopy.StoreCopyFinishedResponse;
 import org.neo4j.causalclustering.catchup.tx.TxPullResponse;
 import org.neo4j.causalclustering.catchup.tx.TxStreamFinishedResponse;
+import org.neo4j.causalclustering.core.state.machines.locks.net.LockResponse;
 import org.neo4j.causalclustering.core.state.snapshot.CoreSnapshot;
 
 @SuppressWarnings("unchecked")
-class TrackingResponseHandler implements CatchUpResponseHandler
+class TrackingResponseHandler implements CoreResponseHandler
 {
-    private CatchUpResponseCallback delegate;
+    private CoreClientResponseCallback delegate;
     private CompletableFuture<?> requestOutcomeSignal = new CompletableFuture<>();
     private final Clock clock;
     private long lastResponseTime;
 
-    TrackingResponseHandler( CatchUpResponseCallback delegate, Clock clock )
+    TrackingResponseHandler( CoreClientResponseCallback delegate, Clock clock )
     {
         this.delegate = delegate;
         this.clock = clock;
         this.lastResponseTime = clock.millis();
     }
 
-    void setResponseHandler( CatchUpResponseCallback responseHandler, CompletableFuture<?>
+    void setResponseHandler( CoreClientResponseCallback responseHandler, CompletableFuture<?>
             requestOutcomeSignal )
     {
         this.delegate = responseHandler;
@@ -122,6 +123,16 @@ class TrackingResponseHandler implements CatchUpResponseHandler
         {
             recordLastResponse();
             delegate.onCoreSnapshot( requestOutcomeSignal, coreSnapshot );
+        }
+    }
+
+    @Override
+    public void onLockResponse( LockResponse response )
+    {
+        if ( !requestOutcomeSignal.isCancelled() )
+        {
+            recordLastResponse();
+            delegate.onLockResponse( requestOutcomeSignal, response );
         }
     }
 

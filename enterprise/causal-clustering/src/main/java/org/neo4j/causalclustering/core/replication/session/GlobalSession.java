@@ -19,60 +19,64 @@
  */
 package org.neo4j.causalclustering.core.replication.session;
 
+import java.io.IOException;
 import java.util.UUID;
 
+import org.neo4j.causalclustering.core.state.storage.SafeChannelMarshal;
 import org.neo4j.causalclustering.identity.MemberId;
-
-import static java.lang.String.format;
+import org.neo4j.causalclustering.messaging.EndOfStreamException;
+import org.neo4j.storageengine.api.ReadableChannel;
+import org.neo4j.storageengine.api.WritableChannel;
 
 public class GlobalSession
 {
-    private final UUID sessionId;
-    private final MemberId owner;
+    private final GlobalSessionId globalId;
+    private final LocalOperationId operationId;
 
-    public GlobalSession( UUID sessionId, MemberId owner )
+    GlobalSession( GlobalSessionId globalId, LocalOperationId operationId )
     {
-        this.sessionId = sessionId;
-        this.owner = owner;
+        this.globalId = globalId;
+        this.operationId = operationId;
     }
 
-    public UUID sessionId()
+    public GlobalSessionId globalId()
     {
-        return sessionId;
+        return globalId;
     }
 
-    public MemberId owner()
+    public LocalOperationId operationId()
     {
-        return owner;
+        return operationId;
     }
 
-    @Override
-    public boolean equals( Object o )
+    public static class Marshal extends SafeChannelMarshal<GlobalSession>
     {
-        if ( this == o )
-        { return true; }
-        if ( o == null || getClass() != o.getClass() )
-        { return false; }
+        public static final GlobalSession.Marshal INSTANCE = new GlobalSession.Marshal();
 
-        GlobalSession that = (GlobalSession) o;
+        @Override
+        public void marshal( GlobalSession session, WritableChannel channel ) throws IOException
+        {
+            channel.putLong( session.globalId().sessionId().getMostSignificantBits() );
+            channel.putLong( session.globalId().sessionId().getLeastSignificantBits() );
+            MemberId.Marshal.INSTANCE.marshal( session.globalId().owner(), channel );
 
-        if ( !sessionId.equals( that.sessionId ) )
-        { return false; }
-        return owner.equals( that.owner );
+            channel.putLong( session.operationId().localSessionId() );
+            channel.putLong( session.operationId().sequenceNumber() );
+        }
 
-    }
+        @Override
+        public GlobalSession unmarshal0( ReadableChannel channel ) throws IOException, EndOfStreamException
+        {
+            long mostSigBits = channel.getLong();
+            long leastSigBits = channel.getLong();
+            MemberId owner = MemberId.Marshal.INSTANCE.unmarshal( channel );
 
-    @Override
-    public int hashCode()
-    {
-        int result = sessionId.hashCode();
-        result = 31 * result + owner.hashCode();
-        return result;
-    }
+            long localSessionId = channel.getLong();
+            long sequenceNumber = channel.getLong();
 
-    @Override
-    public String toString()
-    {
-        return format( "GlobalSession{sessionId=%s, owner=%s}", sessionId, owner );
+            return new GlobalSession(
+                    new GlobalSessionId( new UUID( mostSigBits, leastSigBits ), owner ),
+                    new LocalOperationId( localSessionId, sequenceNumber ) );
+        }
     }
 }

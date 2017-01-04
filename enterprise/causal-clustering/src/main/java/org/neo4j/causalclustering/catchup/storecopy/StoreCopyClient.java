@@ -23,9 +23,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
-import org.neo4j.causalclustering.catchup.CatchUpClient;
-import org.neo4j.causalclustering.catchup.CatchUpClientException;
-import org.neo4j.causalclustering.catchup.CatchUpResponseAdaptor;
+import org.neo4j.causalclustering.catchup.CoreClient;
+import org.neo4j.causalclustering.catchup.CoreCommunicationException;
+import org.neo4j.causalclustering.catchup.CoreClientResponseAdaptor;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.causalclustering.identity.StoreId;
 import org.neo4j.logging.Log;
@@ -33,12 +33,12 @@ import org.neo4j.logging.LogProvider;
 
 public class StoreCopyClient
 {
-    private final CatchUpClient catchUpClient;
+    private final CoreClient coreClient;
     private final Log log;
 
-    public StoreCopyClient( CatchUpClient catchUpClient, LogProvider logProvider )
+    public StoreCopyClient( CoreClient coreClient, LogProvider logProvider )
     {
-        this.catchUpClient = catchUpClient;
+        this.coreClient = coreClient;
         log = logProvider.getLog( getClass() );
     }
 
@@ -46,8 +46,8 @@ public class StoreCopyClient
     {
         try
         {
-            return catchUpClient.makeBlockingRequest( from, new GetStoreRequest( expectedStoreId ),
-                    new CatchUpResponseAdaptor<Long>()
+            return coreClient.makeBlockingRequest( from, new GetStoreRequest( expectedStoreId ),
+                    new CoreClientResponseAdaptor<Long>()
                     {
                         private String destination;
 
@@ -77,7 +77,7 @@ public class StoreCopyClient
                         }
                     } );
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             throw new StoreCopyFailedException( e );
         }
@@ -87,8 +87,8 @@ public class StoreCopyClient
     {
         try
         {
-            return catchUpClient.makeBlockingRequest( from, new GetStoreIdRequest(),
-                    new CatchUpResponseAdaptor<StoreId>()
+            return coreClient.makeBlockingRequest( from, new GetStoreIdRequest(),
+                    new CoreClientResponseAdaptor<StoreId>()
                     {
                         @Override
                         public void onGetStoreIdResponse( CompletableFuture<StoreId> signal,
@@ -98,7 +98,7 @@ public class StoreCopyClient
                         }
                     } );
         }
-        catch ( CatchUpClientException e )
+        catch ( CoreCommunicationException e )
         {
             throw new StoreIdDownloadFailedException( e );
         }

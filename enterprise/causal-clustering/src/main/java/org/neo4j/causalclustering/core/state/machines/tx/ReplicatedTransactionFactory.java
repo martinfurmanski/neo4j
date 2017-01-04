@@ -44,9 +44,9 @@ import static org.neo4j.io.ByteUnit.gibiBytes;
 
 public class ReplicatedTransactionFactory
 {
-    private static final long MAX_SERIALIZED_TX_SIZE = gibiBytes( 1 );
+    private static final long MAX_SERIALIZED_TX_SIZE = gibiBytes( 1 ); // TODO: Really? Hard-coded limit?
 
-    public static ReplicatedTransaction createImmutableReplicatedTransaction( TransactionRepresentation tx  )
+    public static ReplicatedTransaction createImmutableReplicatedTransaction( TransactionRepresentation tx )
     {
         ByteBuf transactionBuffer = Unpooled.buffer();
 
@@ -95,8 +95,7 @@ public class ReplicatedTransactionFactory
 
     private static class TransactionSerializer
     {
-        public static void write( TransactionRepresentation tx, NetworkFlushableChannelNetty4 channel ) throws
-                IOException
+        public static void write( TransactionRepresentation tx, NetworkFlushableChannelNetty4 channel ) throws IOException
         {
             channel.putInt( tx.getAuthorId() );
             channel.putInt( tx.getMasterId() );

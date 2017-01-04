@@ -54,8 +54,8 @@ public abstract class SafeChannelMarshal<STATE> implements ChannelMarshal<STATE>
      *
      * @param channel The channel to read from.
      * @return An unmarshalled object.
-     * @throws IOException
-     * @throws EndOfStreamException
+     * @throws IOException Any I/O exception.
+     * @throws EndOfStreamException The checked end of stream exception.
      */
     protected abstract STATE unmarshal0( ReadableChannel channel ) throws IOException, EndOfStreamException;
 }

@@ -23,7 +23,9 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.causalclustering.catchup.CoreClient;
 import org.neo4j.causalclustering.catchup.storecopy.LocalDatabase;
+import org.neo4j.causalclustering.identity.IdentityModule;
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.replication.RaftReplicator;
 import org.neo4j.causalclustering.core.replication.Replicator;
@@ -31,9 +33,9 @@ import org.neo4j.causalclustering.core.state.machines.id.IdAllocationState;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdAllocationStateMachine;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdGeneratorFactory;
 import org.neo4j.causalclustering.core.state.machines.id.ReplicatedIdRangeAcquirer;
+import org.neo4j.causalclustering.core.state.machines.locks.CoreLockManager;
 import org.neo4j.causalclustering.core.state.machines.locks.LeaderOnlyLockManager;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenState;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedLabelTokenHolder;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedPropertyKeyTokenHolder;
 import org.neo4j.causalclustering.core.state.machines.token.ReplicatedRelationshipTypeTokenHolder;
@@ -44,7 +46,6 @@ import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransactionCo
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransactionStateMachine;
 import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
 import org.neo4j.causalclustering.core.state.storage.StateStorage;
-import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.CommitProcessFactory;
@@ -67,6 +68,7 @@ import org.neo4j.logging.LogProvider;
 import org.neo4j.storageengine.api.Token;
 
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.array_block_id_allocation_size;
+import static org.neo4j.causalclustering.core.CausalClusteringSettings.cluster_allow_writes_on_followers;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.id_alloc_state_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.label_token_id_allocation_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.label_token_name_id_allocation_size;
@@ -80,7 +82,6 @@ import static org.neo4j.causalclustering.core.CausalClusteringSettings.relations
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.relationship_id_allocation_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.relationship_type_token_id_allocation_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.relationship_type_token_name_id_allocation_size;
-import static org.neo4j.causalclustering.core.CausalClusteringSettings.replicated_lock_token_state_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.schema_id_allocation_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.state_machine_apply_max_batch_size;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.string_block_id_allocation_size;
@@ -99,22 +100,20 @@ public class CoreStateMachinesModule
     public final CommitProcessFactory commitProcessFactory;
 
     public final CoreStateMachines coreStateMachines;
+    public final  Locks localLocks;
 
-    public CoreStateMachinesModule( MemberId myself, PlatformModule platformModule, File clusterStateDirectory,
+    public CoreStateMachinesModule( IdentityModule identityModule, PlatformModule platformModule, File clusterStateDirectory,
             Config config, RaftReplicator replicator, LeaderLocator leaderLocator, Dependencies dependencies,
-            LocalDatabase localDatabase )
+            LocalDatabase localDatabase, CoreClient coreClient, ReplicatedLockTokenStateMachine replicatedLockTokenStateMachine )
     {
-        StateStorage<IdAllocationState> idAllocationState;
-        StateStorage<ReplicatedLockTokenState> lockTokenState;
         final LifeSupport life = platformModule.life;
         final FileSystemAbstraction fileSystem = platformModule.fileSystem;
-        LogService logging = platformModule.logging;
-        LogProvider logProvider = logging.getInternalLogProvider();
+        final LogService logging = platformModule.logging;
+        final LogProvider logProvider = logging.getInternalLogProvider();
 
-        lockTokenState = life.add(
-                new DurableStateStorage<>( fileSystem, clusterStateDirectory, LOCK_TOKEN_NAME,
-                        new ReplicatedLockTokenState.Marshal( new MemberId.Marshal() ),
-                        config.get( replicated_lock_token_state_size ), logProvider ) );
+        this.localLocks = CommunityEditionModule.createLockManager( config, logging );
+
+        StateStorage<IdAllocationState> idAllocationState;
 
         idAllocationState = life.add(
                 new DurableStateStorage<>( fileSystem, clusterStateDirectory, ID_ALLOCATION_NAME,
@@ -127,7 +126,7 @@ public class CoreStateMachinesModule
         Map<IdType,Integer> allocationSizes = getIdTypeAllocationSizeFromConfig( config );
 
         ReplicatedIdRangeAcquirer idRangeAcquirer =
-                new ReplicatedIdRangeAcquirer( replicator, idAllocationStateMachine, allocationSizes, myself,
+                new ReplicatedIdRangeAcquirer( replicator, idAllocationStateMachine, allocationSizes, identityModule.myIdentity(),
                         logProvider );
 
         idTypeConfigurationProvider = new EnterpriseIdTypeConfigurationProvider( config );
@@ -154,9 +153,6 @@ public class CoreStateMachinesModule
         ReplicatedLabelTokenHolder labelTokenHolder =
                 new ReplicatedLabelTokenHolder( labelTokenRegistry, replicator, this.idGeneratorFactory, dependencies );
 
-        ReplicatedLockTokenStateMachine replicatedLockTokenStateMachine =
-                new ReplicatedLockTokenStateMachine( lockTokenState );
-
         RecoverTransactionLogState txLogState = new RecoverTransactionLogState( dependencies, logProvider );
 
         ReplicatedTokenStateMachine<Token> labelTokenStateMachine =
@@ -175,8 +171,8 @@ public class CoreStateMachinesModule
 
         dependencies.satisfyDependencies( replicatedTxStateMachine );
 
-        lockManager = createLockManager( config, logging, replicator, myself, leaderLocator,
-                replicatedLockTokenStateMachine );
+        lockManager = createLockManager( config, logging, replicator, identityModule, leaderLocator,
+                replicatedLockTokenStateMachine, coreClient );
 
         coreStateMachines = new CoreStateMachines( replicatedTxStateMachine, labelTokenStateMachine,
                 relationshipTypeTokenStateMachine, propertyKeyTokenStateMachine, replicatedLockTokenStateMachine,
@@ -226,9 +222,17 @@ public class CoreStateMachinesModule
     }
 
     private Locks createLockManager( final Config config, final LogService logging, final Replicator replicator,
-            MemberId myself, LeaderLocator leaderLocator, ReplicatedLockTokenStateMachine lockTokenStateMachine )
+            IdentityModule identityModule, LeaderLocator leaderLocator, ReplicatedLockTokenStateMachine lockTokenStateMachine,
+            CoreClient coreClient )
     {
-        Locks localLocks = CommunityEditionModule.createLockManager( config, logging );
-        return new LeaderOnlyLockManager( myself, replicator, leaderLocator, localLocks, lockTokenStateMachine );
+        if ( config.get( cluster_allow_writes_on_followers ) )
+        {
+            return new CoreLockManager( identityModule.myIdentity(), identityModule.sessionPool(), replicator, leaderLocator, localLocks, lockTokenStateMachine, coreClient );
+        }
+        else
+        {
+            // TODO: Remove in entirety
+            return new LeaderOnlyLockManager( identityModule.myIdentity(), replicator, leaderLocator, localLocks, lockTokenStateMachine );
+        }
     }
 }

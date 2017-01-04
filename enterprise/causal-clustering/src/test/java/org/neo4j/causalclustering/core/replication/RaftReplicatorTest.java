@@ -30,7 +30,7 @@ import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.consensus.ReplicatedInteger;
 import org.neo4j.causalclustering.messaging.Outbound;
-import org.neo4j.causalclustering.core.replication.session.GlobalSession;
+import org.neo4j.causalclustering.core.replication.session.GlobalSessionId;
 import org.neo4j.causalclustering.core.replication.session.LocalSessionPool;
 import org.neo4j.causalclustering.core.state.machines.tx.ConstantTimeRetryStrategy;
 import org.neo4j.causalclustering.core.state.machines.tx.RetryStrategy;
@@ -54,7 +54,7 @@ public class RaftReplicatorTest
     private LeaderLocator leaderLocator = mock( LeaderLocator.class );
     private MemberId myself = new MemberId( UUID.randomUUID() );
     private MemberId leader = new MemberId( UUID.randomUUID() );
-    private GlobalSession session = new GlobalSession( UUID.randomUUID(), myself );
+    private GlobalSessionId session = new GlobalSessionId( UUID.randomUUID(), myself );
     private LocalSessionPool sessionPool = new LocalSessionPool( session );
     private RetryStrategy retryStrategy = new ConstantTimeRetryStrategy( 1, SECONDS );
 

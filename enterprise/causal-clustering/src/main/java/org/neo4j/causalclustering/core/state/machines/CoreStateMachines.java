@@ -34,8 +34,8 @@ import org.neo4j.causalclustering.core.state.machines.token.ReplicatedTokenState
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransaction;
 import org.neo4j.causalclustering.core.state.machines.tx.ReplicatedTransactionStateMachine;
 import org.neo4j.causalclustering.core.state.machines.tx.RecoverTransactionLogState;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenRequest;
-import org.neo4j.causalclustering.core.state.machines.locks.ReplicatedLockTokenStateMachine;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockToken;
+import org.neo4j.causalclustering.core.state.machines.locks.token.ReplicatedLockTokenStateMachine;
 import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
 import org.neo4j.kernel.impl.core.RelationshipTypeToken;
 import org.neo4j.storageengine.api.Token;
@@ -173,7 +173,7 @@ public class CoreStateMachines
         }
 
         @Override
-        public void dispatch( ReplicatedLockTokenRequest lockRequest, long commandIndex, Consumer<Result> callback )
+        public void dispatch( ReplicatedLockToken lockRequest, long commandIndex, Consumer<Result> callback )
         {
             replicatedTxStateMachine.ensuredApplied();
             replicatedLockTokenStateMachine.applyCommand( lockRequest, commandIndex, callback );

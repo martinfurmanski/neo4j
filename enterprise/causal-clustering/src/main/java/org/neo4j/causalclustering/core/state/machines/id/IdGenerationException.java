@@ -21,7 +21,7 @@ package org.neo4j.causalclustering.core.state.machines.id;
 
 import org.neo4j.graphdb.TransactionFailureException;
 
-public class IdGenerationException extends TransactionFailureException
+class IdGenerationException extends TransactionFailureException
 {
     IdGenerationException( Throwable cause )
     {

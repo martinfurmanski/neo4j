@@ -26,7 +26,6 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import java.util.List;
 
 import org.neo4j.causalclustering.identity.StoreId;
-import org.neo4j.causalclustering.messaging.NetworkReadableClosableChannelNetty4;
 import org.neo4j.causalclustering.messaging.marshalling.storeid.StoreIdMarshal;
 
 public class GetStoreIdResponseDecoder extends ByteToMessageDecoder
@@ -34,7 +33,7 @@ public class GetStoreIdResponseDecoder extends ByteToMessageDecoder
     @Override
     protected void decode( ChannelHandlerContext ctx, ByteBuf msg, List<Object> out ) throws Exception
     {
-        StoreId storeId = StoreIdMarshal.INSTANCE.unmarshal( new NetworkReadableClosableChannelNetty4( msg ) );
+        StoreId storeId = StoreIdMarshal.INSTANCE.unmarshal( msg );
         out.add( new GetStoreIdResponse( storeId ) );
     }
 }

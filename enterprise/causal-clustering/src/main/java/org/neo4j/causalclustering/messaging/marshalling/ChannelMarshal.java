@@ -19,10 +19,14 @@
  */
 package org.neo4j.causalclustering.messaging.marshalling;
 
+import io.netty.buffer.ByteBuf;
+
 import java.io.IOException;
 
 import org.neo4j.causalclustering.core.state.storage.SafeChannelMarshal;
 import org.neo4j.causalclustering.messaging.EndOfStreamException;
+import org.neo4j.causalclustering.messaging.NetworkFlushableChannelNetty4;
+import org.neo4j.causalclustering.messaging.NetworkReadableClosableChannelNetty4;
 import org.neo4j.storageengine.api.ReadableChannel;
 import org.neo4j.storageengine.api.WritableChannel;
 
@@ -43,6 +47,14 @@ public interface ChannelMarshal<STATE>
     void marshal( STATE state, WritableChannel channel ) throws IOException;
 
     /**
+     * Marshals the state into the netty buffer.
+     */
+    default void marshal( STATE state, ByteBuf out ) throws IOException
+    {
+        marshal( state, new NetworkFlushableChannelNetty4( out ) );
+    }
+
+    /**
      * Unmarshals an instance of {@link STATE} from channel. If the channel does not have enough bytes
      * to fully read an instance then an {@link EndOfStreamException} must be thrown.
      *
@@ -54,4 +66,12 @@ public interface ChannelMarshal<STATE>
      * for making that apparent.
      */
     STATE unmarshal( ReadableChannel channel ) throws IOException, EndOfStreamException;
+
+    /**
+     * Unmarshals the state from the netty buffer.
+     */
+    default STATE unmarshal( ByteBuf in ) throws IOException, EndOfStreamException
+    {
+        return unmarshal( new NetworkReadableClosableChannelNetty4( in ) );
+    }
 }

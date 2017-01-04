@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import org.neo4j.causalclustering.core.consensus.log.RaftLog;
 import org.neo4j.causalclustering.core.consensus.log.RaftLogEntry;
@@ -32,6 +33,7 @@ import org.neo4j.causalclustering.core.consensus.log.segmented.InFlightMap;
 import org.neo4j.causalclustering.core.consensus.membership.RaftMembershipManager;
 import org.neo4j.causalclustering.core.consensus.outcome.ConsensusOutcome;
 import org.neo4j.causalclustering.core.consensus.outcome.Outcome;
+import org.neo4j.causalclustering.core.consensus.roles.Appending;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
 import org.neo4j.causalclustering.core.consensus.schedule.RenewableTimeoutService;
 import org.neo4j.causalclustering.core.consensus.shipping.RaftLogShippingManager;
@@ -39,6 +41,7 @@ import org.neo4j.causalclustering.core.consensus.state.ExposedRaftState;
 import org.neo4j.causalclustering.core.consensus.state.RaftState;
 import org.neo4j.causalclustering.core.consensus.term.TermState;
 import org.neo4j.causalclustering.core.consensus.vote.VoteState;
+import org.neo4j.causalclustering.core.replication.ReplicatedContent;
 import org.neo4j.causalclustering.core.state.snapshot.RaftCoreState;
 import org.neo4j.causalclustering.core.state.storage.StateStorage;
 import org.neo4j.causalclustering.helper.VolatileFuture;
@@ -62,6 +65,7 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
 {
     private final LeaderNotFoundMonitor leaderNotFoundMonitor;
     private RenewableTimeoutService.RenewableTimeout heartbeatTimer;
+    private Supplier<ReplicatedContent> barrier;
 
     public enum Timeouts implements RenewableTimeoutService.TimeoutName
     {
@@ -75,6 +79,7 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
     private final long heartbeatInterval;
     private RenewableTimeoutService.RenewableTimeout electionTimer;
     private RaftMembershipManager membershipManager;
+    private Collection<Listener<MemberId>> leaderListeners = new ArrayList<>();
 
     private final long electionTimeout;
 
@@ -94,7 +99,7 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
                         LogProvider logProvider, RaftMembershipManager membershipManager,
                         RaftLogShippingManager logShipping,
                         InFlightMap<RaftLogEntry> inFlightMap,
-                        Monitors monitors )
+                        Monitors monitors, Supplier<ReplicatedContent> barrier )
     {
         this.myself = myself;
         this.electionTimeout = electionTimeout;
@@ -107,6 +112,7 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
         this.log = logProvider.getLog( getClass() );
 
         this.membershipManager = membershipManager;
+        this.barrier = barrier;
 
         this.state = new RaftState( myself, termStorage, membershipManager, entryLog, voteStorage, inFlightMap, logProvider );
 
@@ -200,8 +206,6 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
         }
     }
 
-    private Collection<Listener<MemberId>> leaderListeners = new ArrayList<>();
-
     @Override
     public synchronized void registerListener( Listener<MemberId> listener )
     {
@@ -268,6 +272,11 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
     public synchronized ConsensusOutcome handle( RaftMessages.RaftMessage incomingMessage ) throws IOException
     {
         Outcome outcome = currentRole.handler.handle( incomingMessage, state, log );
+
+        if ( outcome.isElectedLeader() )
+        {
+            Appending.appendNewEntry( state, outcome, barrier.get() );
+        }
 
         boolean newLeaderWasElected = leaderChanged( outcome, state.leader() );
 
