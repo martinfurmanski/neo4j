@@ -22,7 +22,6 @@ package org.neo4j.causalclustering.discovery.procedures;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import org.hamcrest.collection.IsIterableContainingInOrder;
@@ -62,7 +61,7 @@ public class ClusterOverviewProcedureTest
         coreMembers.put( follower1, adressesForCore( 1 ) );
         coreMembers.put( follower2, adressesForCore( 2 ) );
 
-        Set<ReadReplicaAddresses> readReplicas = addressesForReadReplicas( 4, 5 );
+        Map<MemberId,ReadReplicaAddresses> readReplicas = addressesForReadReplicas( 4, 5 );
 
         when( topologyService.coreServers() ).thenReturn( new CoreTopology( null, false, coreMembers ) );
         when( topologyService.readReplicas() ).thenReturn( new ReadReplicaTopology( readReplicas ) );
@@ -81,8 +80,8 @@ public class ClusterOverviewProcedureTest
                 new Object[]{theLeader.getUuid().toString(), new String[] {"bolt://localhost:5000"}, "LEADER"},
                 new Object[]{follower1.getUuid().toString(), new String[] {"bolt://localhost:5001"}, "FOLLOWER"},
                 new Object[]{follower2.getUuid().toString(), new String[] {"bolt://localhost:5002"}, "FOLLOWER"},
-                new Object[]{"00000000-0000-0000-0000-000000000000", new String[] {"bolt://localhost:6004"}, "READ_REPLICA"},
-                new Object[]{"00000000-0000-0000-0000-000000000000", new String[] {"bolt://localhost:6005"}, "READ_REPLICA"}
+                new Object[]{"00000000-0000-0000-0000-000000000000", new String[] {"bolt://localhost:7004"}, "READ_REPLICA"},
+                new Object[]{"00000000-0000-0000-0000-000000000000", new String[] {"bolt://localhost:7005"}, "READ_REPLICA"}
         ) );
     }
 }

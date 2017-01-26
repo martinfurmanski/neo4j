@@ -20,19 +20,26 @@
 package org.neo4j.causalclustering.discovery;
 
 import java.util.Arrays;
-import java.util.Set;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.helpers.AdvertisedSocketAddress;
+import org.neo4j.helpers.collection.Pair;
 
 import static java.util.Collections.singletonList;
 import static org.neo4j.causalclustering.discovery.ClientConnectorAddresses.Scheme.bolt;
 
 public class TestTopology
 {
-    public static Set<ReadReplicaAddresses> addressesForReadReplicas( int... ids )
+    public static Map<MemberId,ReadReplicaAddresses> addressesForReadReplicas( int... ids )
     {
-        return Arrays.stream( ids ).mapToObj( TestTopology::addressesForReadReplica ).collect( Collectors.toSet() );
+        return Arrays.stream( ids )
+                .mapToObj( id -> Pair.of( id, addressesForReadReplica( id ) ) )
+                .collect( Collectors.toMap(
+                        pair -> new MemberId( new UUID( 0, pair.first() ) ),
+                        Pair::other ) );
     }
 
     private static ClientConnectorAddresses wrapAsClientConnectorAddresses( AdvertisedSocketAddress advertisedSocketAddress )
@@ -50,7 +57,8 @@ public class TestTopology
 
     public static ReadReplicaAddresses addressesForReadReplica( int id )
     {
-        AdvertisedSocketAddress boltServerAddress = new AdvertisedSocketAddress( "localhost", (6000 + id) );
-        return new ReadReplicaAddresses( wrapAsClientConnectorAddresses( boltServerAddress ) );
+        AdvertisedSocketAddress catchupServerAddress = new AdvertisedSocketAddress( "localhost", (6000 + id) );
+        AdvertisedSocketAddress boltServerAddress = new AdvertisedSocketAddress( "localhost", (7000 + id) );
+        return new ReadReplicaAddresses( wrapAsClientConnectorAddresses( boltServerAddress ), catchupServerAddress );
     }
 }
