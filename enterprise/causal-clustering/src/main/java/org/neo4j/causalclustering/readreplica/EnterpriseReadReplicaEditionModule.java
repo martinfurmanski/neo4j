@@ -185,9 +185,8 @@ public class EnterpriseReadReplicaEditionModule extends EditionModule
 
         long inactivityTimeoutMillis = config.get( CausalClusteringSettings.catch_up_client_inactivity_timeout );
         CatchUpClient catchUpClient = life.add(
-                new CatchUpClient( readReplicaTopologyService, logProvider, Clocks.systemClock(), inactivityTimeoutMillis,
-
-                        monitors ) );
+                new CatchUpClient( readReplicaTopologyService, logProvider, Clocks.systemClock(),
+                        inactivityTimeoutMillis, monitors ) );
 
         final Supplier<DatabaseHealth> databaseHealthSupplier = dependencies.provideDependency( DatabaseHealth.class );
 

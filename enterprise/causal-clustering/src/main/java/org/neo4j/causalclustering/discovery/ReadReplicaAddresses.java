@@ -26,7 +26,7 @@ public class ReadReplicaAddresses implements ClientConnector, CatchupServerAddre
     private final AdvertisedSocketAddress catchupServerAddress;
     private final ClientConnectorAddresses clientConnectorAddresses;
 
-    ReadReplicaAddresses( ClientConnectorAddresses clientConnectorAddresses, AdvertisedSocketAddress catchupServerAddress )
+    public ReadReplicaAddresses( ClientConnectorAddresses clientConnectorAddresses, AdvertisedSocketAddress catchupServerAddress )
     {
         this.clientConnectorAddresses = clientConnectorAddresses;
         this.catchupServerAddress = catchupServerAddress;
