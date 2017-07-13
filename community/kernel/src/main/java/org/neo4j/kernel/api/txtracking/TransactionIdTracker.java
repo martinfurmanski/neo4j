@@ -22,6 +22,7 @@ package org.neo4j.kernel.api.txtracking;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import org.neo4j.kernel.AvailabilityGuard;
@@ -82,23 +83,22 @@ public class TransactionIdTracker
             return;
         }
 
-        if ( !tryAwaitEx( () -> isReady( oldestAcceptableTxId ), timeout.toMillis(), TimeUnit.MILLISECONDS,
-                POLL_INTERVAL, POLL_UNIT, clock ) )
-        {
-            throw new TransactionFailureException( Status.Transaction.InstanceStateChanged,
-                    "Database not up to the requested version: %d. Latest database version is %d", oldestAcceptableTxId,
-                    transactionIdStore().getLastClosedTransactionId() );
-        }
-    }
-
-    private boolean isReady( long oldestAcceptableTxId ) throws TransactionFailureException
-    {
         if ( !availabilityGuard.isAvailable() )
         {
             throw new TransactionFailureException( Status.General.DatabaseUnavailable,
                     "Database had become unavailable while waiting for requested version %d.", oldestAcceptableTxId );
         }
-        return oldestAcceptableTxId <= transactionIdStore().getLastClosedTransactionId();
+
+        try
+        {
+            transactionIdStore().awaitClosedTransactionId( oldestAcceptableTxId, timeout.toMillis() );
+        }
+        catch ( InterruptedException | TimeoutException e )
+        {
+            throw new TransactionFailureException( Status.Transaction.InstanceStateChanged, e,
+                    "Database not up to the requested version: %d. Latest database version is %d", oldestAcceptableTxId,
+                    transactionIdStore().getLastClosedTransactionId() );
+        }
     }
 
     private TransactionIdStore transactionIdStore()
