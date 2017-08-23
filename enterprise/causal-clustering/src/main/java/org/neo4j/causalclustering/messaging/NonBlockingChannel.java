@@ -22,178 +22,85 @@ package org.neo4j.causalclustering.messaging;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.util.concurrent.FutureListener;
+import io.netty.util.concurrent.Future;
 
-import java.io.IOException;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.LockSupport;
-
-import org.neo4j.causalclustering.messaging.monitoring.MessageQueueMonitor;
 import org.neo4j.helpers.AdvertisedSocketAddress;
 import org.neo4j.logging.Log;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.locks.LockSupport.parkNanos;
 
 class NonBlockingChannel
 {
     private static final int CONNECT_BACKOFF_IN_MS = 250;
-    /* This pause is a maximum for retrying in case of a park/unpark race as well as for any other abnormal
-    situations. */
-    private static final int RETRY_DELAY_MS = 100;
-    private final Thread messageSendingThread;
-    private final Log log;
-    private Channel nettyChannel;
-    private Bootstrap bootstrap;
-    private AdvertisedSocketAddress destination;
-    private Queue<Object> messageQueue = new ConcurrentLinkedQueue<>();
-    private volatile boolean stillRunning = true;
-    private final MessageQueueMonitor monitor;
-    private final int maxQueueSize;
-    private FutureListener<Void> errorListener;
 
-    NonBlockingChannel( Bootstrap bootstrap, final AdvertisedSocketAddress destination,
-            final Log log, MessageQueueMonitor monitor, int maxQueueSize )
+    private final Log log;
+    private final Bootstrap bootstrap;
+    private final AdvertisedSocketAddress destination;
+
+    private volatile Channel nettyChannel;
+    private volatile boolean disposed;
+
+    NonBlockingChannel( Bootstrap bootstrap, final AdvertisedSocketAddress destination, final Log log )
     {
         this.bootstrap = bootstrap;
         this.destination = destination;
-        this.monitor = monitor;
-        this.maxQueueSize = maxQueueSize;
         this.log = log;
 
-        this.errorListener = future ->
-        {
-            if ( !future.isSuccess() )
-            {
-                log.error( "Failed to send message to " + destination, future.cause() );
-            }
-        };
-
-        messageSendingThread = new Thread( this::messageSendingThreadWork );
-        messageSendingThread.start();
+        doConnect();
     }
 
-    private void messageSendingThreadWork()
+    private void doConnect()
     {
-        while ( stillRunning )
+        if ( disposed )
         {
-            try
-            {
-                ensureConnected();
-
-                if ( sendMessages() )
-                {
-                    nettyChannel.flush();
-                }
-            }
-            catch ( IOException e )
-            {
-                /* IO-exceptions from inside netty are dealt with by closing any existing channel and retrying with a
-                 fresh one. */
-                if ( nettyChannel != null )
-                {
-                    log.warn( "Got exception for: " + nettyChannel + ". Will reconnect.", e );
-                    nettyChannel.close();
-                    nettyChannel = null;
-                }
-            }
-
-            parkNanos( MILLISECONDS.toNanos( RETRY_DELAY_MS ) );
+            return;
         }
 
-        if ( nettyChannel != null )
+        ChannelFuture cf = bootstrap.connect( destination.socketAddress() );
+        cf.addListener( ( ChannelFuture f ) ->
         {
-            nettyChannel.close();
-            messageQueue.clear();
-            monitor.queueSize( destination, messageQueue.size() );
-        }
+            if ( !f.isSuccess() )
+            {
+                f.channel().eventLoop().schedule( this::doConnect, CONNECT_BACKOFF_IN_MS, MILLISECONDS );
+            }
+            else
+            {
+                log.info( "Connected: " + f.channel() );
+                f.channel().closeFuture().addListener( closed ->
+                {
+                    log.warn( String.format( "Lost connection to: %s (%s)", destination, nettyChannel.remoteAddress() ) );
+                    f.channel().eventLoop().schedule( this::doConnect, CONNECT_BACKOFF_IN_MS, MILLISECONDS );
+                } );
+            }
+        } );
+
+        nettyChannel = cf.channel();
+
+        /* this wait is purely optimistic to avoid getting early messages discarded and
+        clients will have to rely on resending where the connection was not yet up */
+        cf.awaitUninterruptibly( 1000, MILLISECONDS );
     }
 
     public void dispose()
     {
-        stillRunning = false;
-
-        while ( messageSendingThread.isAlive() )
-        {
-            messageSendingThread.interrupt();
-
-            try
-            {
-                messageSendingThread.join( 100 );
-            }
-            catch ( InterruptedException e )
-            {
-                // Do nothing
-            }
-        }
+        disposed = true;
+        nettyChannel.close();
     }
 
-    public void send( Object msg )
+    public Future<Void> send( Object msg )
     {
-        if ( !stillRunning )
+        if ( disposed )
         {
             throw new IllegalStateException( "sending on disposed channel" );
         }
 
-        if ( messageQueue.size() < maxQueueSize )
+        try
         {
-            messageQueue.offer( msg );
-            LockSupport.unpark( messageSendingThread );
-            monitor.queueSize( destination, messageQueue.size());
+            return nettyChannel.writeAndFlush( msg );
         }
-        else
+        catch ( Throwable e )
         {
-            monitor.droppedMessage( destination );
-        }
-    }
-
-    private boolean sendMessages() throws IOException
-    {
-        if ( nettyChannel == null )
-        {
-            return false;
-        }
-
-        boolean sentSomething = false;
-        Object message;
-        while ( (message = messageQueue.peek()) != null )
-        {
-            ChannelFuture write = nettyChannel.write( message );
-            write.addListener( errorListener );
-
-            messageQueue.poll();
-            monitor.queueSize( destination, messageQueue.size());
-            sentSomething = true;
-        }
-
-        return sentSomething;
-    }
-
-    private void ensureConnected() throws IOException
-    {
-        if ( nettyChannel != null && !nettyChannel.isOpen() )
-        {
-            log.warn( String.format( "Lost connection to: %s (%s)", destination, nettyChannel.remoteAddress() ) );
-            nettyChannel = null;
-        }
-
-        while ( nettyChannel == null && stillRunning )
-        {
-            ChannelFuture channelFuture = bootstrap.connect( destination.socketAddress() );
-
-            Channel channel = channelFuture.awaitUninterruptibly().channel();
-            if ( channelFuture.isSuccess() )
-            {
-                channel.flush();
-                nettyChannel = channel;
-                log.info( "Connected: " + nettyChannel );
-            }
-            else
-            {
-                channel.close();
-                parkNanos( MILLISECONDS.toNanos( CONNECT_BACKOFF_IN_MS ) );
-            }
+            return nettyChannel.newFailedFuture( e );
         }
     }
 }
