@@ -33,6 +33,7 @@ import org.neo4j.causalclustering.core.consensus.ConsensusModule;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
 import org.neo4j.causalclustering.core.replication.Replicator;
+import org.neo4j.causalclustering.core.replication.TransactionBenchmarkProcedure;
 import org.neo4j.causalclustering.core.server.CoreServerModule;
 import org.neo4j.causalclustering.core.state.ClusterStateDirectory;
 import org.neo4j.causalclustering.core.state.ClusterStateException;
@@ -156,6 +157,7 @@ public class EnterpriseCoreEditionModule extends EditionModule
         procedures.register( new CoreRoleProcedure( consensusModule.raftMachine() ) );
         procedures.registerComponent( Replicator.class, ( x ) -> replicationModule.getReplicator(), true );
         procedures.registerProcedure( ReplicationBenchmarkProcedure.class );
+        procedures.registerProcedure( TransactionBenchmarkProcedure.class );
     }
 
     EnterpriseCoreEditionModule( final PlatformModule platformModule,
