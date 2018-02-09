@@ -24,7 +24,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import org.neo4j.logging.AssertableLogProvider;
@@ -33,7 +32,6 @@ import org.neo4j.logging.Log;
 import static org.hamcrest.Matchers.equalTo;
 import static org.neo4j.logging.AssertableLogProvider.inLog;
 
-@Ignore
 public class NettyPipelineBuilderTest
 {
     private AssertableLogProvider logProvider = new AssertableLogProvider();
@@ -45,7 +43,7 @@ public class NettyPipelineBuilderTest
     {
         // given
         RuntimeException ex = new RuntimeException();
-        NettyPipelineBuilder.with( channel.pipeline(), log ).add( new ChannelInboundHandlerAdapter()
+        NettyPipelineBuilder.with( channel.pipeline(), log ).add( "read_handler", new ChannelInboundHandlerAdapter()
         {
             @Override
             public void channelRead( ChannelHandlerContext ctx, Object msg )
@@ -93,7 +91,7 @@ public class NettyPipelineBuilderTest
     public void shouldLogExceptionOutbound()
     {
         RuntimeException ex = new RuntimeException();
-        NettyPipelineBuilder.with( channel.pipeline(), log ).add( new ChannelOutboundHandlerAdapter()
+        NettyPipelineBuilder.with( channel.pipeline(), log ).add( "write_handler" , new ChannelOutboundHandlerAdapter()
         {
             @Override
             public void write( ChannelHandlerContext ctx, Object msg, ChannelPromise promise )
@@ -113,7 +111,7 @@ public class NettyPipelineBuilderTest
     public void shouldLogExceptionOutboundWithVoidPromise()
     {
         RuntimeException ex = new RuntimeException();
-        NettyPipelineBuilder.with( channel.pipeline(), log ).add( new ChannelOutboundHandlerAdapter()
+        NettyPipelineBuilder.with( channel.pipeline(), log ).add( "write_handler", new ChannelOutboundHandlerAdapter()
         {
             @Override
             public void write( ChannelHandlerContext ctx, Object msg, ChannelPromise promise )
@@ -142,7 +140,7 @@ public class NettyPipelineBuilderTest
                 // handled
             }
         };
-        NettyPipelineBuilder.with( channel.pipeline(), log ).add( handler ).install();
+        NettyPipelineBuilder.with( channel.pipeline(), log ).add( "read_handler", handler ).install();
 
         // when
         channel.writeOneInbound( msg );
@@ -164,7 +162,7 @@ public class NettyPipelineBuilderTest
                 ctx.write( ctx.alloc().buffer() );
             }
         };
-        NettyPipelineBuilder.with( channel.pipeline(), log ).add( encoder ).install();
+        NettyPipelineBuilder.with( channel.pipeline(), log ).add( "write_handler" , encoder ).install();
 
         // when
         channel.writeAndFlush( msg );

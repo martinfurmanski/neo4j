@@ -22,7 +22,7 @@ package org.neo4j.causalclustering.protocol.handshake;
 /**
  * Messages to the server, generally requests.
  */
-interface ServerMessage
+public interface ServerMessage
 {
     void dispatch( ServerMessageHandler handler );
 }

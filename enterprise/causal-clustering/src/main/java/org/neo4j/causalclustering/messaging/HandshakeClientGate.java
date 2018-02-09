@@ -20,59 +20,69 @@
 package org.neo4j.causalclustering.messaging;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.concurrent.Future;
+import io.netty.channel.ChannelPromise;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 
 import org.neo4j.causalclustering.protocol.handshake.ClientHandshakeException;
 import org.neo4j.causalclustering.protocol.handshake.HandshakeClientInitializer;
 import org.neo4j.causalclustering.protocol.handshake.HandshakeFinishedEvent;
+import org.neo4j.causalclustering.protocol.handshake.ServerMessage;
 import org.neo4j.logging.Log;
 
 /**
  * Gates messages written before the handshake has completed. The handshake is finalized
  * by firing a HandshakeFinishedEvent (as a netty user event) in {@link HandshakeClientInitializer}.
  */
-public class HandshakeGate implements ChannelInterceptor
+public class HandshakeClientGate extends ChannelDuplexHandler
 {
-    public static final String HANDSHAKE_GATE = "HandshakeGate";
-
     private final CompletableFuture<Void> handshakePromise = new CompletableFuture<>();
+    private final Channel channel;
+    private final Log log;
 
-    HandshakeGate( Channel channel, Log log )
+    public HandshakeClientGate( Channel channel, Log log )
     {
-        log.info( "Handshake gate added" );
-        channel.pipeline().addFirst( HANDSHAKE_GATE, new ChannelInboundHandlerAdapter()
-        {
-            @Override
-            public void userEventTriggered( ChannelHandlerContext ctx, Object evt ) throws Exception
-            {
-                if ( HandshakeFinishedEvent.getSuccess().equals( evt ) )
-                {
-                    log.info( "Handshake gate success" );
-                    handshakePromise.complete( null );
-                }
-                else if ( HandshakeFinishedEvent.getFailure().equals( evt ) )
-                {
-                    log.warn( "Handshake gate failed" );
-                    handshakePromise.completeExceptionally( new ClientHandshakeException( "Handshake failed" ) );
-                    channel.close();
-                }
-                else
-                {
-                    super.userEventTriggered( ctx, evt );
-                }
-            }
-        } );
+        this.channel = channel;
+        this.log = log;
     }
 
     @Override
-    public void write( BiFunction<Channel,Object,Future<Void>> writer, Channel channel, Object msg, CompletableFuture<Void> promise )
+    public void userEventTriggered( ChannelHandlerContext ctx, Object evt ) throws Exception
     {
-        handshakePromise.whenComplete( ( ignored, failure ) ->
-                writer.apply( channel, msg ).addListener( x -> promise.complete( null ) ) );
+        if ( HandshakeFinishedEvent.getSuccess().equals( evt ) )
+        {
+            log.info( "Handshake gate success" );
+            handshakePromise.complete( null );
+        }
+        else if ( HandshakeFinishedEvent.getFailure().equals( evt ) )
+        {
+            log.warn( "Handshake gate failed" );
+            handshakePromise.completeExceptionally( new ClientHandshakeException( "Handshake failed" ) );
+            channel.close();
+        }
+        else
+        {
+            super.userEventTriggered( ctx, evt );
+        }
+    }
+
+    @Override
+    public void write( ChannelHandlerContext ctx, Object msg, ChannelPromise promise ) throws Exception
+    {
+        if ( handshakePromise.isDone() || msg instanceof ServerMessage )
+        {
+            ctx.write( msg, promise );
+        }
+        else
+        {
+            handshakePromise.whenComplete( ( ignored, failure ) -> {
+                if ( failure == null )
+                {
+                    channel.writeAndFlush( msg, promise );
+                }
+            } );
+        }
     }
 }

@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
 import org.neo4j.causalclustering.helper.ExponentialBackoffStrategy;
 import org.neo4j.causalclustering.helper.TimeoutStrategy;
+import org.neo4j.causalclustering.messaging.HandshakeClientGate;
 import org.neo4j.causalclustering.messaging.SimpleNettyChannel;
 import org.neo4j.causalclustering.protocol.NettyPipelineBuilderFactory;
 import org.neo4j.causalclustering.protocol.Protocol;
@@ -68,9 +69,10 @@ public class HandshakeClientInitializer extends ChannelInitializer<SocketChannel
     {
         pipelineBuilderFactory.create( channel, log )
                 .addFraming()
-                .add( new ClientMessageEncoder() )
-                .add( new ClientMessageDecoder() )
-                .add( new NettyHandshakeClient( handshakeClient ) )
+                .add( "handshake_client_encoder", new ClientMessageEncoder() )
+                .add( "handshake_client_decoder", new ClientMessageDecoder() )
+                .add( "handshake_client", new NettyHandshakeClient( handshakeClient ) )
+                .addFixed( "handshake_gate", new HandshakeClientGate( channel, log ) )
                 .install();
     }
 
