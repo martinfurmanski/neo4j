@@ -230,5 +230,4 @@ public class MultiClusteringIT
     }
 
     //TODO: Test that rejoining followers wait for majority of hosts *for each database* to be available before joining
-
 }

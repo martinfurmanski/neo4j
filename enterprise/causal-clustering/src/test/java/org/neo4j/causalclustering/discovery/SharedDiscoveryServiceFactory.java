@@ -42,5 +42,4 @@ public class SharedDiscoveryServiceFactory implements DiscoveryServiceFactory
     {
         return new SharedDiscoveryReadReplicaClient( discoveryService, config, myself, logProvider );
     }
-
 }
