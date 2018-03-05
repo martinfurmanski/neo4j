@@ -26,10 +26,12 @@ import org.junit.runners.model.Statement;
 import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
@@ -40,6 +42,7 @@ import org.neo4j.causalclustering.helpers.CausalClusteringTestHelpers;
 import org.neo4j.causalclustering.scenarios.DiscoveryServiceType;
 import org.neo4j.graphdb.config.Setting;
 import org.neo4j.kernel.impl.store.format.standard.Standard;
+import org.neo4j.management.CausalClustering;
 import org.neo4j.test.rule.TestDirectory;
 import org.neo4j.test.rule.VerboseTimeout;
 
