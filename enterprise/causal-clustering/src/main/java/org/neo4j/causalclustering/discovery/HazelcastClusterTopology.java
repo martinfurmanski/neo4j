@@ -40,13 +40,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
+import org.neo4j.causalclustering.core.consensus.RaftLeader;
 import org.neo4j.causalclustering.identity.ClusterId;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.helpers.AdvertisedSocketAddress;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.logging.Log;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.neo4j.causalclustering.core.CausalClusteringSettings.refuse_to_be_leader;
 import static java.util.stream.Stream.concat;

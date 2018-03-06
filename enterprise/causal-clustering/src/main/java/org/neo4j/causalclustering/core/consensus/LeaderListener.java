@@ -19,14 +19,14 @@
  */
 package org.neo4j.causalclustering.core.consensus;
 
-import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.kernel.impl.util.Listener;
 
-public interface LeaderLocator
+/**
+ * Simple reimplementation of the {@link Listener} interface, specifically designed for listening
+ * leadership changes as the result of Leadership Elections in {@link RaftMachine}
+ */
+public interface LeaderListener extends Listener<RaftLeader>
 {
-    MemberId getLeader() throws NoLeaderFoundException;
-
-    void registerListener( LeaderListener listener );
-
-    void unregisterListener( LeaderListener listener );
+    @Override
+    void receive( RaftLeader newLeader );
 }

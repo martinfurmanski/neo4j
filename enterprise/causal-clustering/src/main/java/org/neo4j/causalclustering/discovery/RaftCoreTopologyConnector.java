@@ -21,6 +21,8 @@ package org.neo4j.causalclustering.discovery;
 
 import java.util.Set;
 
+import org.neo4j.causalclustering.core.consensus.LeaderListener;
+import org.neo4j.causalclustering.core.consensus.RaftLeader;
 import org.neo4j.causalclustering.core.consensus.RaftMachine;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.kernel.impl.util.Listener;
@@ -29,7 +31,7 @@ import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 /**
  * Makes the Raft aware of changes to the core topology and visa versa
  */
-public class RaftCoreTopologyConnector extends LifecycleAdapter implements CoreTopologyService.Listener, Listener<MemberId>
+public class RaftCoreTopologyConnector extends LifecycleAdapter implements CoreTopologyService.Listener, LeaderListener
 {
     private final CoreTopologyService coreTopologyService;
     private final RaftMachine raftMachine;
@@ -57,11 +59,9 @@ public class RaftCoreTopologyConnector extends LifecycleAdapter implements CoreT
     }
 
     @Override
-    public void receive( MemberId notification )
+    public void receive( RaftLeader newLeader )
     {
-        //TODO: Create LeaderListener interface implementing Listener<MemberId>
-        //Don't like this pattern as its not clear form the api that receive() is called from raftMachine.
-        coreTopologyService.setLeader( notification, dbName, raftMachine.term() );
+        coreTopologyService.setLeader( newLeader.memberId(), dbName, newLeader.term() );
     }
 
     @Override

@@ -23,8 +23,10 @@ import java.time.Clock;
 import java.util.concurrent.Future;
 import java.util.function.BiConsumer;
 
+import org.neo4j.causalclustering.core.consensus.LeaderListener;
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.consensus.NoLeaderFoundException;
+import org.neo4j.causalclustering.core.consensus.RaftLeader;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.replication.session.LocalSessionPool;
 import org.neo4j.causalclustering.core.replication.session.OperationContext;
@@ -41,7 +43,7 @@ import org.neo4j.logging.LogProvider;
 /**
  * A replicator implementation suitable in a RAFT context. Will handle resending due to timeouts and leader switches.
  */
-public class RaftReplicator extends LifecycleAdapter implements Replicator, Listener<MemberId>
+public class RaftReplicator extends LifecycleAdapter implements Replicator, LeaderListener
 {
     private final MemberId me;
     private final Outbound<MemberId,RaftMessages.RaftMessage> outbound;
@@ -137,7 +139,7 @@ public class RaftReplicator extends LifecycleAdapter implements Replicator, List
     }
 
     @Override
-    public void receive( MemberId leader )
+    public void receive( RaftLeader ignoredLeader )
     {
         progressTracker.triggerReplicationEvent();
     }

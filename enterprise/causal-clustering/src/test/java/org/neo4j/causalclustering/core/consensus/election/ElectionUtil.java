@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.neo4j.causalclustering.core.consensus.LeaderListener;
 import org.neo4j.causalclustering.core.consensus.RaftMachine;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.helpers.collection.Iterables;
@@ -74,11 +75,11 @@ public class ElectionUtil
             validRafts, Map<MemberId,MemberId> leaderViews, long viewCount, CompletableFuture<MemberId>
             futureAgreedLeader )
     {
-        Listener<MemberId> listener = newLeader ->
+        LeaderListener listener = newLeader ->
         {
             synchronized ( leaderViews )
             {
-                leaderViews.put( raft.identity(), newLeader );
+                leaderViews.put( raft.identity(), newLeader.memberId() );
 
                 boolean leaderIsValid = false;
                 for ( RaftMachine validRaft : validRafts )
@@ -89,9 +90,9 @@ public class ElectionUtil
                     }
                 }
 
-                if ( newLeader != null && leaderIsValid && allAgreeOnLeader( leaderViews, viewCount, newLeader ) )
+                if ( newLeader != null && leaderIsValid && allAgreeOnLeader( leaderViews, viewCount, newLeader.memberId() ) )
                 {
-                    futureAgreedLeader.complete( newLeader );
+                    futureAgreedLeader.complete( newLeader.memberId() );
                 }
             }
         };

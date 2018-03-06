@@ -20,7 +20,6 @@
 package org.neo4j.causalclustering.discovery;
 
 import com.hazelcast.client.impl.MemberImpl;
-import com.hazelcast.concurrent.atomicreference.AtomicReferenceProxy;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IAtomicReference;
 import com.hazelcast.core.IMap;
@@ -32,7 +31,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +44,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.neo4j.causalclustering.core.CausalClusteringSettings;
+import org.neo4j.causalclustering.core.consensus.RaftLeader;
 import org.neo4j.causalclustering.helpers.CausalClusteringTestHelpers;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.helpers.AdvertisedSocketAddress;

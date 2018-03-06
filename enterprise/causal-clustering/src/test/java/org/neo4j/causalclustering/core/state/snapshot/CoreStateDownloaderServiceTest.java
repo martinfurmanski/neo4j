@@ -30,8 +30,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.neo4j.causalclustering.catchup.CatchupAddressProvider;
+import org.neo4j.causalclustering.core.consensus.LeaderListener;
 import org.neo4j.causalclustering.core.consensus.LeaderLocator;
 import org.neo4j.causalclustering.core.consensus.NoLeaderFoundException;
+import org.neo4j.causalclustering.core.consensus.roles.Leader;
 import org.neo4j.causalclustering.core.state.CommandApplicationProcess;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.function.Predicates;
@@ -149,13 +151,13 @@ public class CoreStateDownloaderServiceTest
         }
 
         @Override
-        public void registerListener( Listener<MemberId> listener )
+        public void registerListener( LeaderListener listener )
         {
             // do nothing
         }
 
         @Override
-        public void unregisterListener( Listener<MemberId> listener )
+        public void unregisterListener( LeaderListener listener )
         {
             // do nothing
         }

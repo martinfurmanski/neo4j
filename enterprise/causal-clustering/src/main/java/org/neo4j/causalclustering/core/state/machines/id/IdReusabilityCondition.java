@@ -21,7 +21,10 @@ package org.neo4j.causalclustering.core.state.machines.id;
 
 import java.util.function.BooleanSupplier;
 
+import org.neo4j.causalclustering.core.consensus.LeaderListener;
+import org.neo4j.causalclustering.core.consensus.RaftLeader;
 import org.neo4j.causalclustering.core.consensus.RaftMachine;
+import org.neo4j.causalclustering.core.consensus.roles.Leader;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.kernel.impl.util.Listener;
 
@@ -29,7 +32,7 @@ import org.neo4j.kernel.impl.util.Listener;
  * Determines whether it is safe to reuse freed ids, based on current leader and tracking its own transactions.
  * This should guarantee that a single freed id only ends up on a single core.
  */
-public class IdReusabilityCondition implements BooleanSupplier, Listener<MemberId>
+public class IdReusabilityCondition implements BooleanSupplier, LeaderListener
 {
     private static final BooleanSupplier ALWAYS_FALSE = () -> false;
 
@@ -54,9 +57,9 @@ public class IdReusabilityCondition implements BooleanSupplier, Listener<MemberI
     }
 
     @Override
-    public void receive( MemberId newLeader )
+    public void receive( RaftLeader newLeader )
     {
-        if ( myself.equals( newLeader ) )
+        if ( myself.equals( newLeader.memberId() ) )
         {
             // We just became leader
             currentSupplier = new LeaderIdReusabilityCondition( commandIndexTracker, raftMachine );

@@ -33,6 +33,7 @@ import org.neo4j.causalclustering.core.consensus.log.cache.InFlightCache;
 import org.neo4j.causalclustering.core.consensus.membership.RaftMembershipManager;
 import org.neo4j.causalclustering.core.consensus.outcome.ConsensusOutcome;
 import org.neo4j.causalclustering.core.consensus.outcome.Outcome;
+import org.neo4j.causalclustering.core.consensus.roles.Leader;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
 import org.neo4j.causalclustering.core.consensus.schedule.TimerService;
 import org.neo4j.causalclustering.core.consensus.shipping.RaftLogShippingManager;
@@ -81,6 +82,8 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
     private final Log log;
     private Role currentRole = Role.FOLLOWER;
 
+    private Collection<LeaderListener> leaderListeners;
+
     private RaftLogShippingManager logShipping;
 
     public RaftMachine( MemberId myself, StateStorage<TermState> termStorage, StateStorage<VoteState> voteStorage, RaftLog entryLog,
@@ -100,6 +103,7 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
         this.inFlightCache = inFlightCache;
         this.state = new RaftState( myself, termStorage, membershipManager, entryLog, voteStorage, inFlightCache,
                 logProvider, supportPreVoting, refuseToBecomeLeader );
+        this.leaderListeners = new ArrayList<>();
 
         leaderNotFoundMonitor = monitors.newMonitor( LeaderNotFoundMonitor.class );
     }
@@ -186,17 +190,14 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
         }
     }
 
-    private Collection<Listener<MemberId>> leaderListeners = new ArrayList<>();
-
     @Override
-    public synchronized void registerListener( Listener<MemberId> listener )
+    public synchronized void registerListener( LeaderListener listener )
     {
         leaderListeners.add( listener );
-        listener.receive( state.leader() );
     }
 
     @Override
-    public synchronized void unregisterListener( Listener listener )
+    public synchronized void unregisterListener( LeaderListener listener )
     {
         leaderListeners.remove( listener );
     }
@@ -213,10 +214,9 @@ public class RaftMachine implements LeaderLocator, CoreMetaData
 
     private void notifyLeaderChanges( Outcome outcome )
     {
-        for ( Listener<MemberId> listener : leaderListeners )
+        for ( LeaderListener listener : leaderListeners )
         {
-            //TODO: Update to pass leader and term, probably creating a leader-term pair/immutable struct
-            listener.receive( outcome.getLeader() );
+            listener.receive( new RaftLeader( outcome.getLeader(), outcome.getTerm() ) );
         }
     }
 
